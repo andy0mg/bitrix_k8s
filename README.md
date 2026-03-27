@@ -109,6 +109,115 @@ automation/                 Ansible + скрипты
 
 ---
 
+## С нуля до работающего сайта (пошагово)
+
+Ниже — один сквозной сценарий: **ваш ноутбук/ПК** гоняет Ansible по SSH, на **ВМ** поднимается Kubernetes (kubeadm), NFS и Bitrix в кластере.
+
+### 0. Что должно быть заранее
+
+- Несколько **виртуальных машин с Ubuntu 22.04** (или Debian). Минимально разумно: **2 ВМ** — одна под кластер (control plane), вторая под **NFS**. Лучше ещё **1–2 ВМ worker**, иначе поды с Битриксом на master **не запустятся** (на control plane по умолчанию стоит taint `NoSchedule`).
+- У всех ВМ **статичные IP**, доступ по **SSH** с вашей машины (логин с `sudo` без пароля или знайте пароль sudo).
+- На **вашей машине** (Linux, macOS или **WSL** в Windows): установлены **Git**, **Python 3**, **Ansible**, **kubectl**, **Helm**. Пример для Ubuntu/WSL:
+  ```bash
+  sudo apt update && sudo apt install -y git python3-pip
+  pip install --user ansible
+  # helm и kubectl — по официальным инструкциям с сайтов kubernetes.io / helm.sh
+  ```
+- **Домен** для сайта (например `bitrix.company.ru`) желателен для TLS. Пока можно работать по **IP** (см. шаг 9) — Let’s Encrypt по IP не выдаст, тогда в `group_vars/all.yml` отключите TLS для теста или используйте свой сертификат позже.
+
+### 1. Склонировать проект
+
+```bash
+git clone https://github.com/andy0mg/bitrix_k8s.git
+cd bitrix_k8s
+```
+
+(Либо свой форк/репозиторий — главное, чтобы был каталог с `automation/ansible`.)
+
+### 2. Подготовить конфиги Ansible
+
+```bash
+bash automation/scripts/init-ansible-config.sh
+```
+
+Откройте в редакторе:
+
+1. **`automation/ansible/inventory/hosts.yml`** (скопирован из примера).  
+   - `k8s_control` — **одна** ВМ, с неё будет `kubeadm init`. Укажите **`ansible_host`** = её IP.  
+   - `k8s_workers` — **остальные** ВМ под приложения (рекомендуется). У каждой свой `ansible_host`.  
+   - `nfs_server` — ВМ с NFS (можно отдельная).  
+   - Везде один и тот же `ansible_user` (например `ubuntu`), если логин одинаковый.
+
+2. **`automation/ansible/group_vars/all.yml`** (скопирован из примера). Обязательно поменяйте:
+   - **`bitrix_domain`** — ваш домен (или временно IP вида `192.168.1.10.nip.io`, если используете nip.io для теста).
+   - **`k8s_join_workers: true`**, если в inventory есть worker-ноды.
+   - **`kubeadm_kubeconfig_public_address`** — **тот же IP**, что у первой control plane, **как с вашего ПК достигается API** (часто внешний/локальный IP первой ВМ). Нужен для файла `kubeconfig` на вашей машине.
+   - **`letsencrypt_email`** — реальный email для сертификата (если TLS включён).
+
+Для **кластера без workers** (только один master): после установки **снимите taint**, иначе поды не встанут:
+
+```bash
+export KUBECONFIG=$PWD/automation/build/kubeconfig
+kubectl taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule-
+```
+
+(Лучше всё же добавить хотя бы одну worker-ВМ и `k8s_join_workers: true`.)
+
+### 3. Запустить полный деплой
+
+```bash
+cd automation/ansible
+ansible-playbook playbooks/site.yml
+```
+
+Ansible по очереди: подготовит ноды, **kubeadm init**, сеть **Flannel**, при необходимости **join** workers, положит **`../../automation/build/kubeconfig`**, настроит **NFS**, поставит **ingress / nfs-client provisioner / metrics / cert-manager** и **Helm chart Bitrix**.
+
+Время — от **15–40 минут**, зависимо от сети и железа.
+
+### 4. Проверить кластер и Bitrix
+
+```bash
+export KUBECONFIG="$(pwd)/../../automation/build/kubeconfig"
+kubectl get nodes
+kubectl get pods -n bitrix
+```
+
+Все поды в `bitrix` должны стать **Running** (PostgreSQL и веб могут стартовать дольше).
+
+Пароли БД/Redis лежат в **`automation/build/bitrix-secrets.yaml`** (файл в `.gitignore`).
+
+### 5. Как открыть сайт в браузере
+
+- Узнайте IP, на котором висит **Ingress** (часто это IP ноды, где запущен `ingress-nginx-controller`):
+  ```bash
+  kubectl get svc -n ingress-nginx
+  ```
+  Если **EXTERNAL-IP** пустой — на «голом» железе поставьте **MetalLB** или смотрите **NodePort** и заходите `http://IP-ноды:NodePort` (в зависимости от сервиса; для учебника проще поднять MetalLB или один внешний L4).
+
+- Пропишите **DNS**: имя из **`bitrix_domain`** → IP Ingress (или в файл `hosts` на своём ПК для теста).
+
+- Откройте **`https://ваш-домен/`** (или **http** если TLS отключали). Мастер установки может быть по **`/bitrixsetup.php`** — смотрите раздел «Первичная установка» ниже в README.
+
+### 6. Если что-то пошло не так
+
+- **`ansible-playbook` падает на SSH** — проверьте ключи: `ssh ubuntu@IP` с той же машины.  
+- **`pending` у PVC** — нет StorageClass **nfs-client** или NFS недоступен с нод. Проверьте экспорт на ВМ NFS и Helm **nfs-subdir-external-provisioner**.  
+- **Поды не на нодах** — taint на master и нет workers; см. шаг 2.  
+- **Сертификат Let’s Encrypt не выдаётся** — порт **80** с интернета до Ingress и корректный **DNS** на этот IP.
+
+### 7. Не хотите Ansible — только Helm
+
+Если Kubernetes у вас уже есть и есть **kubeconfig**:
+
+```bash
+export KUBECONFIG=/путь/к/admin.conf
+LE_EMAIL=you@mail.com bash automation/scripts/helm-deploy-from-kubeconfig.sh ваш-домен.ru
+```
+
+(Предварительно в кластере должны быть **RWX** StorageClass, **ingress-nginx** и при TLS — **cert-manager** по желанию.)
+
+---
+
 ## Автоматизация деплоя
 
 Нужны: **Ansible** и **Helm** на машине, с которой запускаете плейбуки (Linux, WSL или macOS), **SSH** к Ubuntu/Debian ВМ. По умолчанию **`playbooks/site.yml`** поднимает **Kubernetes через kubeadm** (containerd, официальный apt kubernetes, **Flannel**), сохраняет `automation/build/kubeconfig`, при необходимости настраивает **NFS**, затем через **Helm** — ingress-nginx, nfs-subdir-external-provisioner, metrics-server, cert-manager и чарт **Bitrix**. Вместо kubeadm можно использовать **k3s**: `ansible-playbook playbooks/site-k3s.yml` (в `group_vars` для metrics часто нужно `metrics_server_patch_kubelet_insecure_tls: true`).
