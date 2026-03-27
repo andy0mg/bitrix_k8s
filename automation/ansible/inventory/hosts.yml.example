@@ -1,6 +1,12 @@
 ---
 # cp inventory/hosts.yml.example inventory/hosts.yml
-# ansible_controller — отдельная группа (как k8s_*), иначе у older ansible ключи под all без hosts: дают warning.
+#
+# Не делайте так (будет warning «unexpected key ansible_controller»):
+#   all:
+#     ansible_controller: ...
+# Нужно только: all → children → ansible_controller → hosts → deploy
+#
+# ansible_controller — отдельная группа (как k8s_*).
 all:
   vars:
     ansible_user: ubuntu

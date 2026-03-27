@@ -1,0 +1,27 @@
+---
+# Плеи addons/bitrix выполняются на localhost — нужны бинарники на этой же машине.
+- name: Проверить helm в PATH
+  ansible.builtin.shell: command -v helm
+  args:
+    executable: /bin/bash
+  register: _helm_bin
+  changed_when: false
+  failed_when: false
+
+- name: Проверить kubectl в PATH
+  ansible.builtin.shell: command -v kubectl
+  args:
+    executable: /bin/bash
+  register: _kubectl_bin
+  changed_when: false
+  failed_when: false
+
+- name: Нужны helm и kubectl на машине запуска ansible-playbook
+  ansible.builtin.fail:
+    msg: |
+      Плей выполняется на localhost — в PATH этой машины должны быть helm и kubectl.
+      Сейчас: helm={{ 'найден' if _helm_bin.rc == 0 else 'НЕТ' }}, kubectl={{ 'найден' if _kubectl_bin.rc == 0 else 'НЕТ' }}.
+      Примеры установки:
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        kubectl — https://kubernetes.io/docs/tasks/tools/ (или пакет kubectl из того же apt, что kubelet на админ-хосте)
+  when: _helm_bin.rc != 0 or _kubectl_bin.rc != 0

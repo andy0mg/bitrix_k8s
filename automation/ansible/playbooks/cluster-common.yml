@@ -18,6 +18,9 @@
     repo_root: "{{ repo_root_override | default(playbook_dir | dirname | dirname | dirname) }}"
     kubeconfig_local: "{{ repo_root }}/automation/build/kubeconfig"
   pre_tasks:
+    - name: Локальные зависимости (helm, kubectl)
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/local-cli-prereqs.yml"
+
     - name: Подгрузить group_vars/all.yml для localhost
       ansible.builtin.include_vars:
         file: "{{ playbook_dir }}/../group_vars/all.yml"
@@ -165,6 +168,9 @@
     secrets_path: "{{ repo_root }}/automation/build/bitrix-secrets.yaml"
     extra_values_path: "{{ repo_root }}/automation/build/bitrix-extra-values.yaml"
   pre_tasks:
+    - name: Локальные зависимости (helm, kubectl)
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/local-cli-prereqs.yml"
+
     - name: Подгрузить group_vars/all.yml для localhost
       ansible.builtin.include_vars:
         file: "{{ playbook_dir }}/../group_vars/all.yml"
