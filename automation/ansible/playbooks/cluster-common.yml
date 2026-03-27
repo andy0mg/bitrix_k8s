@@ -165,15 +165,32 @@
       changed_when: _ms_tol.rc == 0
       failed_when: false
 
-    - name: Патч metrics-server (insecure kubelet TLS — нужно для k3s и части узких сборок)
+    - name: Патч metrics-server (insecure kubelet TLS — k3s и типичный kubeadm без kubelet-сертификатов)
       ansible.builtin.command: >
         kubectl patch deployment metrics-server -n kube-system --type=json
         -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
         --kubeconfig={{ kubeconfig_local }}
-      when: metrics_server_patch_kubelet_insecure_tls | default(false)
+      when: metrics_server_patch_kubelet_insecure_tls | default(true)
       register: _msp
       changed_when: "'patched' in (_msp.stdout | default(''))"
       failed_when: false
+
+    - name: Пересоздать поды metrics-server (убрать старый Pending после смены tolerations)
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - delete
+          - pods
+          - -n
+          - kube-system
+          - -l
+          - k8s-app=metrics-server
+          - --kubeconfig={{ kubeconfig_local }}
+          - --ignore-not-found
+          - --wait=false
+      when: metrics_server_tolerate_control_plane | default(ingress_nginx_on_control_plane | default(true)) | bool
+      register: _ms_pods_del
+      changed_when: "'deleted' in (_ms_pods_del.stdout | default(''))"
 
     - name: Шаблон values для cert-manager
       ansible.builtin.template:

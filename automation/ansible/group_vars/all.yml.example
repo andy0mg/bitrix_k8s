@@ -51,8 +51,8 @@ cert_manager_release: cert-manager
 # Разрешить поды + post-install Job на control-plane (по умолчанию как ingress_nginx_on_control_plane)
 # cert_manager_on_control_plane: true
 
-# Для kubeadm обычно не нужен; для k3s часто true
-metrics_server_patch_kubelet_insecure_tls: false
+# На простом kubeadm без корректных kubelet TLS metrics-server часто не становится Ready — тогда true
+metrics_server_patch_kubelet_insecure_tls: true
 # Поднимать metrics-server на control-plane при одной ноде (по умолчанию как ingress_nginx_on_control_plane)
 # metrics_server_tolerate_control_plane: true
 
