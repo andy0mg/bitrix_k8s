@@ -1,5 +1,6 @@
-# Сгенерировано Ansible — размещение на control-plane (иначе Helm ждёт hook Job в Pending)
-{% if cert_manager_on_control_plane | default(ingress_nginx_on_control_plane | default(true)) | bool %}
+# Сгенерировано Ansible. Только при cert_manager_on_control_plane: true — привязка к master.
+# Не наследуем от ingress: при ingress на CP и cert-manager на CP webhook часто не становится Ready (CPU/taint).
+{% if cert_manager_on_control_plane | default(false) | bool %}
 # Сохраняем kubernetes.io/os: linux из дефолтов чарта + CP
 nodeSelector:
   kubernetes.io/os: linux
@@ -48,5 +49,16 @@ startupapicheck:
       operator: Exists
       effect: NoSchedule
 {% else %}
-{}
+# Явно снять привязку к CP (иначе helm upgrade оставляет старые nodeSelector от прошлого релиза).
+nodeSelector: {}
+tolerations: []
+webhook:
+  nodeSelector: {}
+  tolerations: []
+cainjector:
+  nodeSelector: {}
+  tolerations: []
+startupapicheck:
+  nodeSelector: {}
+  tolerations: []
 {% endif %}

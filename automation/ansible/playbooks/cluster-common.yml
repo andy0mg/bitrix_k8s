@@ -293,6 +293,24 @@
       register: _bsi
       changed_when: "'deleted' in ((_bsi.stdout | default('')) ~ (_bsi.stderr | default('')))"
 
+    - name: Шаблон values cert-manager (отдельно от ingress — см. cert_manager_on_control_plane)
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/cert-manager-values.yaml.j2"
+        dest: "{{ repo_root }}/automation/build/cert-manager-values.yaml"
+        mode: "0644"
+      when: cert_manager_install | default(true) | bool
+
+    - name: Helm upgrade cert-manager (применить placement webhook/cainjector)
+      ansible.builtin.command: >
+        helm upgrade --install {{ cert_manager_release }} jetstack/cert-manager
+        --kubeconfig {{ kubeconfig_local }}
+        --namespace {{ cert_manager_namespace }} --create-namespace
+        --timeout {{ helm_install_timeout | default('15m') }}
+        --set installCRDs=true
+        -f {{ repo_root }}/automation/build/cert-manager-values.yaml
+      when: cert_manager_install | default(true) | bool
+      changed_when: true
+
     - name: Namespace cert-manager (для ожидания webhook)
       ansible.builtin.command:
         argv:

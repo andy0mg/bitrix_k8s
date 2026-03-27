@@ -61,8 +61,8 @@ cert_manager_release: cert-manager
 # Повторы helm upgrade bitrix при ошибке webhook / сети
 # bitrix_helm_retries: 5
 # bitrix_helm_retry_delay: 45
-# Разрешить поды + post-install Job на control-plane (по умолчанию как ingress_nginx_on_control_plane)
-# cert_manager_on_control_plane: true
+# true только если один master и весь стек на CP. С workers — false, иначе webhook конкурирует с ingress на CP.
+cert_manager_on_control_plane: false
 
 # На простом kubeadm без корректных kubelet TLS metrics-server часто не становится Ready — тогда true
 metrics_server_patch_kubelet_insecure_tls: true
