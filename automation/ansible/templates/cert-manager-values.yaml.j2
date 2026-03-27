@@ -1,6 +1,10 @@
-# Сгенерировано Ansible. Только при cert_manager_on_control_plane: true — привязка к master.
-# Не наследуем от ingress: при ingress на CP и cert-manager на CP webhook часто не становится Ready (CPU/taint).
-{% if cert_manager_on_control_plane | default(false) | bool %}
+# Сгенерировано Ansible. Привязка к master только если задано cert_manager_on_control_plane: true
+# или (по умолчанию) если k8s_join_workers: false — один master без воркеров.
+# Не наследуем от ingress: при workers и ingress на CP cert-manager на том же CP часто даёт webhook 0/1.
+{% set _cm_pin_cp = (cert_manager_on_control_plane
+  if cert_manager_on_control_plane is defined
+  else not (k8s_join_workers | default(false) | bool)) | bool %}
+{% if _cm_pin_cp %}
 # Сохраняем kubernetes.io/os: linux из дефолтов чарта + CP
 nodeSelector:
   kubernetes.io/os: linux
