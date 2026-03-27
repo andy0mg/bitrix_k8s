@@ -16,6 +16,32 @@
   changed_when: false
   failed_when: false
 
+- name: Разрешённый путь к helm (обход symlinks)
+  ansible.builtin.command:
+    argv:
+      - readlink
+      - -f
+      - "{{ _helm_bin.stdout | trim }}"
+  register: _helm_readlink
+  changed_when: false
+  failed_when: false
+  when: _helm_bin.rc == 0
+
+- name: Helm из Snap не видит чарты в /root
+  ansible.builtin.fail:
+    msg: |
+      Helm запускается из Snap ({{ (_helm_readlink.stdout | default(_helm_bin.stdout)) | trim }}).
+      Из песочницы Snap часто нет доступа к /root/bitrix_k8s → ложная ошибка «Chart.yaml file is missing».
+
+      Варианты:
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        # бинарь попадёт в /usr/local/bin — вне Snap
+
+      или перенесите репозиторий: git clone … в /opt/bitrix_k8s и работайте оттуда.
+  when:
+    - _helm_bin.rc == 0
+    - "'/snap/' in ((_helm_readlink.stdout | default('')) ~ (_helm_bin.stdout | default('')))"
+
 - name: Нужны helm и kubectl на машине запуска ansible-playbook
   ansible.builtin.fail:
     msg: |
