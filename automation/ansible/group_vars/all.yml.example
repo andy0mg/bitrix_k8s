@@ -53,9 +53,11 @@ bitrix_on_control_plane: false
 cert_manager_install: true
 cert_manager_namespace: cert-manager
 cert_manager_release: cert-manager
-# Перед Helm Bitrix (ClusterIssuer): ожидание webhook; при таймауте — rollout restart и повтор
-# cert_manager_webhook_wait_timeout: 10m
-# cert_manager_webhook_retry_wait_timeout: 5m
+# Перед Helm Bitrix: опрос cert-manager-webhook (короткие kubectl get). Отключить ожидание: bitrix_wait_cert_manager_webhook: false
+# bitrix_wait_cert_manager_webhook: true
+# cert_manager_webhook_poll_attempts: 48
+# cert_manager_webhook_poll_interval: 5
+# cert_manager_webhook_restart_after_attempt: 18
 # Повторы helm upgrade bitrix при ошибке webhook / сети
 # bitrix_helm_retries: 5
 # bitrix_helm_retry_delay: 45

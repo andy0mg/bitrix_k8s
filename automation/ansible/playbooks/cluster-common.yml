@@ -305,59 +305,49 @@
       failed_when: false
       changed_when: false
 
-    - name: Дождаться cert-manager webhook (ClusterIssuer admission)
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - wait
-          - --kubeconfig={{ kubeconfig_local }}
-          - deployment/cert-manager-webhook
-          - -n
-          - "{{ cert_manager_namespace | default('cert-manager') }}"
-          - --for=condition=Available=True
-          - --timeout={{ cert_manager_webhook_wait_timeout | default('10m') }}
+    # kubectl wait --timeout=10m часто «висит» без вывода; здесь короткие get + sleep ( Ansible всё ещё видит ход).
+    - name: Дождаться cert-manager webhook (опрос readyReplicas, не kubectl wait)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export KUBECONFIG="{{ kubeconfig_local }}"
+        NS="{{ cert_manager_namespace | default('cert-manager') }}"
+        ATT={{ cert_manager_webhook_poll_attempts | default(48) | int }}
+        SL={{ cert_manager_webhook_poll_interval | default(5) | int }}
+        RESTART_AT={{ cert_manager_webhook_restart_after_attempt | default(18) | int }}
+        for i in $(seq 1 "$ATT"); do
+          if [ "$i" -eq "$RESTART_AT" ]; then
+            echo "attempt $i: rollout restart cert-manager-webhook"
+            kubectl rollout restart deployment/cert-manager-webhook -n "$NS" 2>/dev/null || true
+            sleep 8
+          fi
+          if ! kubectl get deploy cert-manager-webhook -n "$NS" &>/dev/null; then
+            echo "attempt $i: deployment not found yet"
+            sleep "$SL"
+            continue
+          fi
+          r=$(kubectl get deploy cert-manager-webhook -n "$NS" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "")
+          d=$(kubectl get deploy cert-manager-webhook -n "$NS" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "")
+          r=${r:-0}
+          d=${d:-1}
+          if [ "$r" -ge "$d" ] && [ "$d" -ge 1 ]; then
+            echo "cert-manager-webhook ready ($r/$d) at attempt $i"
+            exit 0
+          fi
+          echo "attempt $i/$ATT: cert-manager-webhook readyReplicas=$r replicas=$d"
+          sleep "$SL"
+        done
+        echo "--- debug: cert-manager namespace ---"
+        kubectl get deploy,pods,events -n "$NS" --sort-by=.metadata.creationTimestamp 2>/dev/null | tail -50 || true
+        exit 1
+      args:
+        executable: /bin/bash
       when:
         - cert_manager_install | default(true) | bool
         - bitrix_create_cluster_issuer | default(true) | bool
         - _cm_ns_ok.rc == 0
-      register: _cm_wh1
-      failed_when: false
+        - bitrix_wait_cert_manager_webhook | default(true) | bool
+      register: _cm_wh_poll
       changed_when: false
-
-    - name: Перезапуск cert-manager-webhook если не готов к admission
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - rollout
-          - restart
-          - deployment/cert-manager-webhook
-          - -n
-          - "{{ cert_manager_namespace | default('cert-manager') }}"
-          - --kubeconfig={{ kubeconfig_local }}
-      when:
-        - cert_manager_install | default(true) | bool
-        - bitrix_create_cluster_issuer | default(true) | bool
-        - _cm_ns_ok.rc == 0
-        - not (_cm_wh1.skipped | default(false))
-        - (_cm_wh1.rc | default(1)) != 0
-
-    - name: Повторно дождаться cert-manager webhook
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - wait
-          - --kubeconfig={{ kubeconfig_local }}
-          - deployment/cert-manager-webhook
-          - -n
-          - "{{ cert_manager_namespace | default('cert-manager') }}"
-          - --for=condition=Available=True
-          - --timeout={{ cert_manager_webhook_retry_wait_timeout | default('5m') }}
-      when:
-        - cert_manager_install | default(true) | bool
-        - bitrix_create_cluster_issuer | default(true) | bool
-        - _cm_ns_ok.rc == 0
-        - not (_cm_wh1.skipped | default(false))
-        - (_cm_wh1.rc | default(0)) != 0
 
     - name: Helm install / upgrade Bitrix
       ansible.builtin.shell: |
