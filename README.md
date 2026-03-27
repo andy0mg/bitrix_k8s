@@ -69,7 +69,8 @@ Sphinx :9306 ◄──────────────────── php
 ```
 helm/bitrix/                Helm chart (рекомендуемый деплой)
 ├── Chart.yaml
-├── values.yaml              self-hosted / production
+├── values.yaml              по умолчанию: 1 web, без HPA (одна нода)
+├── values-ha.yaml          3 реплики + HPA (несколько нод)
 ├── values-minikube.yaml    локальная разработка
 ├── NOTES.txt
 └── templates/               манифесты с шаблонами
@@ -544,12 +545,15 @@ define("BX_TEMPORARY_FILES_DIRECTORY", "/opt/.bx_temp");
 
 ### Масштабирование
 
-HPA автоматически добавляет/убирает поды при нагрузке:
-- Порог CPU: 70%
-- Порог памяти: 80%
-- Min: 3 реплики, Max: 10
+По умолчанию в [`helm/bitrix/values.yaml`](helm/bitrix/values.yaml): **1** реплика `bitrix-web`, **HPA выключен** — иначе на одной ноде типичны зависший rollout и `Pending` (минимум HPA 3 не помещается).
 
-Каждая новая реплика автоматически получает свой memcached sidecar и включается в пул через headless Service `memcached-headless`.
+Для **нескольких нод** и HPA подключите [`helm/bitrix/values-ha.yaml`](helm/bitrix/values-ha.yaml):
+
+```bash
+helm upgrade bitrix ./helm/bitrix -n bitrix -f your-secrets.yaml -f ./helm/bitrix/values-ha.yaml
+```
+
+Когда HPA включён, он добавляет/убирает поды при нагрузке (пороги CPU 70%, памяти 80%, по умолчанию min 3 / max 10 в `values-ha.yaml`). Каждая реплика получает memcached sidecar и попадает в пул через headless Service `memcached-headless`.
 
 ---
 

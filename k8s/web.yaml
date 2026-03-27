@@ -39,7 +39,7 @@ metadata:
   name: bitrix-web
   namespace: bitrix
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: bitrix-web

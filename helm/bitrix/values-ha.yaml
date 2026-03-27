@@ -1,0 +1,9 @@
+# Несколько worker-нод и HPA: подключайте вместе с основными values / secrets.
+# Пример: helm upgrade bitrix . -n bitrix -f secrets.yaml -f values-ha.yaml
+web:
+  replicaCount: 3
+
+hpa:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10

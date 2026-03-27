@@ -77,8 +77,10 @@ wwwBootstrap:
     limits:
       memory: 3Gi
 
+# По умолчанию 1 реплика и без HPA: на одной ноде 3×web + minReplicas=3 даёт вечный rollout/Pending.
+# Несколько нод + автоматическое масштабирование: -f values-ha.yaml или свой override.
 web:
-  replicaCount: 3
+  replicaCount: 1
   resources:
     nginx:
       requests:
@@ -100,8 +102,8 @@ web:
         memory: 512Mi
 
 hpa:
-  enabled: true
-  minReplicas: 3
+  enabled: false
+  minReplicas: 1
   maxReplicas: 10
   targetCPUUtilizationPercentage: 70
   targetMemoryUtilizationPercentage: 80
