@@ -208,6 +208,7 @@ kubectl get pods -n bitrix
 - **`pending` у PVC** — нет StorageClass **nfs-client** или NFS недоступен с нод. Проверьте экспорт на ВМ NFS и Helm **nfs-subdir-external-provisioner**.  
 - **Поды не на нодах** — taint на master и нет workers; см. шаг 2.  
 - **`Установить ingress-nginx` долго крутится** — Helm ждёт hook Job (admission webhook). На закинутом control-plane без workers Job мог быть **Pending**, если не хватает tolerations; в чарте для этого добавлены `admissionWebhooks.patch` в values. Параллельно: `kubectl get pods,job -n ingress-nginx`. Таймаут Helm: **`helm_install_timeout`** в `group_vars`.  
+- **`Установить cert-manager` зависает** — то же: post-install **startupapicheck** Job и поды webhook ждут ноду; при **только control-plane** в `automation/build/cert-manager-values.yaml` задаются tolerations (по умолчанию синхронно с **`ingress_nginx_on_control_plane`**). Смотреть: `kubectl get pods,job -n cert-manager`.  
 - **Сертификат Let’s Encrypt не выдаётся** — порт **80** с интернета до Ingress и корректный **DNS** на этот IP.
 
 ### 7. Не хотите Ansible — только Helm

@@ -149,6 +149,13 @@
       changed_when: "'patched' in (_msp.stdout | default(''))"
       failed_when: false
 
+    - name: Шаблон values для cert-manager
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/cert-manager-values.yaml.j2"
+        dest: "{{ repo_root }}/automation/build/cert-manager-values.yaml"
+        mode: "0644"
+      when: cert_manager_install | default(true)
+
     - name: Установить cert-manager
       ansible.builtin.command: >
         helm upgrade --install {{ cert_manager_release }} jetstack/cert-manager
@@ -156,6 +163,7 @@
         --namespace {{ cert_manager_namespace }} --create-namespace
         --timeout {{ helm_install_timeout | default('15m') }}
         --set installCRDs=true
+        -f {{ repo_root }}/automation/build/cert-manager-values.yaml
       when: cert_manager_install | default(true)
       changed_when: true
 

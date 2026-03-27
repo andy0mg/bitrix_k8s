@@ -46,6 +46,8 @@ ingress_nginx_on_control_plane: true
 cert_manager_install: true
 cert_manager_namespace: cert-manager
 cert_manager_release: cert-manager
+# Разрешить поды + post-install Job на control-plane (по умолчанию как ingress_nginx_on_control_plane)
+# cert_manager_on_control_plane: true
 
 # Для kubeadm обычно не нужен; для k3s часто true
 metrics_server_patch_kubelet_insecure_tls: false
