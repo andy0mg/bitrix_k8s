@@ -3,6 +3,7 @@
 # Использование:
 #   export KUBECONFIG=/path/to/kubeconfig
 #   LE_EMAIL=you@example.com ./helm-deploy-from-kubeconfig.sh portal.example.com
+# Одна нода с taint на master (по умолчанию): tolerations в extra-values. Отключить: BITRIX_ON_CONTROL_PLANE=false
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DOMAIN="${1:?Укажите домен FQDN, например portal.example.com}"
@@ -11,6 +12,7 @@ REL="${REL:-bitrix}"
 RWX="${RWX:-nfs-client}"
 RWO="${RWO:-}"
 : "${LE_EMAIL:=admin@example.com}"
+: "${BITRIX_ON_CONTROL_PLANE:=true}"
 
 if ! command -v helm >/dev/null 2>&1; then
   echo "Нужен helm в PATH" >&2
@@ -43,12 +45,27 @@ if [[ -n "$RWO" ]]; then
   RWO_LINE="    rwo: \"$RWO\""
 fi
 
+CP_BLOCK=""
+if [[ "${BITRIX_ON_CONTROL_PLANE}" == "true" ]]; then
+  CP_BLOCK="  nodeSelector:
+    node-role.kubernetes.io/control-plane: \"\"
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+"
+fi
+
 cat >"$EXTRA" <<EOF
 global:
   domain: "$DOMAIN"
   storageClass:
     rwx: "$RWX"
 $RWO_LINE
+$CP_BLOCK
 createNamespace: false
 ingress:
   enabled: true

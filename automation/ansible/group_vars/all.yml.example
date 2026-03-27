@@ -46,8 +46,8 @@ ingress_nginx_repo: https://kubernetes.github.io/ingress-nginx
 ingress_nginx_chart: ingress-nginx/ingress-nginx
 # Поды контроллера только на control plane (taint + nodeSelector). false = поведение чарта по умолчанию
 ingress_nginx_on_control_plane: true
-# Поды Bitrix (и web=1 / HPA off) на CP: то же, что ingress_nginx_on_control_plane, либо явно при master с taint:
-# bitrix_on_control_plane: true
+# Bitrix на workers без taint CP: явно false. Иначе в extra-values (и без этих ключей по умолчанию) — tolerations под master.
+# bitrix_on_control_plane: false
 
 # --- cert-manager ---
 cert_manager_install: true
