@@ -1,3 +1,6 @@
+# Локальные настройки IDE
+.cursor/
+
 # Секреты и kubeconfig из автоматизации
 automation/build/**
 !automation/build/.gitkeep

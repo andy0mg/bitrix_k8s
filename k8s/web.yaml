@@ -48,8 +48,43 @@ spec:
       labels:
         app: bitrix-web
     spec:
-      # initContainer устанавливает права для пользователя bitrix (uid=1000)
       initContainers:
+        # Скачивание Bitrix24 Enterprise (PostgreSQL) в корень сайта. flock на RWX — однократная распаковка при нескольких репликах.
+        - name: fetch-portal-archive
+          image: alpine:3.20
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /opt/www
+              L=/opt/www/.bootstrap-portal.lock
+              M=/opt/www/.bitrix-portal-extracted
+              (
+                flock -x 200
+                if [ -f "$M" ]; then exit 0; fi
+                if [ -d /opt/www/bitrix ] && [ -n "$(ls -A /opt/www/bitrix 2>/dev/null || true)" ]; then
+                  touch "$M"
+                  exit 0
+                fi
+                apk add --no-cache ca-certificates curl tar gzip util-linux
+                curl -fsSL "https://www.1c-bitrix.ru/download/portal/bitrix24_enterprise_postgresql_encode.tar.gz" -o /tmp/portal.tar.gz
+                tar -xzf /tmp/portal.tar.gz -C /opt/www
+                rm -f /tmp/portal.tar.gz
+                touch "$M"
+              ) 200>"$L"
+          volumeMounts:
+            - name: www-data
+              mountPath: /opt/www
+          securityContext:
+            runAsUser: 0
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 3Gi
+        # initContainer устанавливает права для пользователя bitrix (uid=1000)
         - name: init-permissions
           image: busybox:1.36
           command:

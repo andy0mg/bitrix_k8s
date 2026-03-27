@@ -154,6 +154,7 @@ LE_EMAIL=you@example.com bash automation/scripts/helm-deploy-from-kubeconfig.sh 
 | `global.storageClass.rwo` | **ReadWriteOnce** для PostgreSQL / Sphinx (пусто = default SC) |
 | `secrets.*` | Пароли БД, Redis, `pushSecurityKey` (128 символов) |
 | `web.replicaCount` | Реплики веба (в Minikube — 1) |
+| `wwwBootstrap` | Скачивание и распаковка дистрибутива в `/opt/www` при первом старте (`url`, `stripComponents`, `sha256sum`, `enabled`) |
 | `hpa.enabled` | Включить HPA (в Minikube — `false`) |
 | `ingress.tls.enabled` / `ingress.tls.certManager` | TLS и Let's Encrypt через cert-manager |
 | `certManager.createClusterIssuer` | Создать ClusterIssuer в кластере |
@@ -351,13 +352,15 @@ kubectl get ingress -n bitrix
 
 ## Первичная установка Битрикс
 
+По умолчанию (Helm `wwwBootstrap.enabled: true` и манифест `k8s/web.yaml`) init-контейнер один раз скачивает архив **bitrix24_enterprise_postgresql_encode.tar.gz** с сайта 1С-Битрикс и распаковывает его в `/opt/www` (при нескольких репликах используется блокировка на томе). Повторный запуск пропускается, если есть маркер `.bitrix-portal-extracted` или непустой `bitrix/`. Отключить: в values задайте `wwwBootstrap.enabled: false` или уберите init `fetch-portal-archive` из `k8s/web.yaml`.
+
 После того как все поды запущены и PVC `bitrix-www` примонтирован:
 
 ```bash
 # Подключитесь к php-fpm поду
 kubectl exec -it -n bitrix deployment/bitrix-web -c php-fpm -- sh
 
-# Скачайте установщик
+# Если ставили только bitrixsetup.php без полного дистрибутива — скачайте установщик:
 cd /opt/www
 wget https://www.1c-bitrix.ru/download/scripts/bitrixsetup.php
 # или для восстановления из бэкапа:

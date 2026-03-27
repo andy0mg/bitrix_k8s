@@ -48,6 +48,45 @@ spec:
         {{- include "bitrix.labels" . | nindent 8 }}
     spec:
       initContainers:
+        {{- if .Values.wwwBootstrap.enabled }}
+        - name: fetch-portal-archive
+          image: {{ .Values.wwwBootstrap.image | quote }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /opt/www
+              L=/opt/www/.bootstrap-portal.lock
+              M=/opt/www/.bitrix-portal-extracted
+              (
+                flock -x 200
+                if [ -f "$M" ]; then exit 0; fi
+                if [ -d /opt/www/bitrix ] && [ -n "$(ls -A /opt/www/bitrix 2>/dev/null || true)" ]; then
+                  touch "$M"
+                  exit 0
+                fi
+                apk add --no-cache ca-certificates curl tar gzip util-linux
+                curl -fsSL {{ .Values.wwwBootstrap.url | quote }} -o /tmp/portal.tar.gz
+              {{ if .Values.wwwBootstrap.sha256sum }}
+                echo "{{ .Values.wwwBootstrap.sha256sum }}  /tmp/portal.tar.gz" | sha256sum -c
+              {{ end }}
+              {{ if gt (int (.Values.wwwBootstrap.stripComponents | default 0)) 0 }}
+                tar -xzf /tmp/portal.tar.gz -C /opt/www --strip-components={{ int .Values.wwwBootstrap.stripComponents }}
+              {{ else }}
+                tar -xzf /tmp/portal.tar.gz -C /opt/www
+              {{ end }}
+                rm -f /tmp/portal.tar.gz
+                touch "$M"
+              ) 200>"$L"
+          volumeMounts:
+            - name: www-data
+              mountPath: /opt/www
+          securityContext:
+            runAsUser: 0
+          resources:
+            {{- toYaml .Values.wwwBootstrap.resources | nindent 12 }}
+        {{- end }}
         - name: init-permissions
           image: {{ .Values.images.busybox | quote }}
           command:

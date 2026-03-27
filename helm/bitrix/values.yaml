@@ -59,6 +59,22 @@ images:
   memcached: memcached:1.6.41-alpine
   busybox: busybox:1.36
 
+# Скачивание дистрибутива портала в /opt/www при первом старте (flock на RWX — один раз при нескольких репликах).
+wwwBootstrap:
+  enabled: true
+  image: alpine:3.20
+  url: https://www.1c-bitrix.ru/download/portal/bitrix24_enterprise_postgresql_encode.tar.gz
+  # Если архив кладёт всё в один верхний каталог — укажите 1 (или больше).
+  stripComponents: 0
+  # Опционально: sha256:... для проверки (пусто — без проверки).
+  sha256sum: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 3Gi
+
 web:
   replicaCount: 3
   resources:
