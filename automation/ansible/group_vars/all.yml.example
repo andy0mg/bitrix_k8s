@@ -46,6 +46,8 @@ ingress_nginx_repo: https://kubernetes.github.io/ingress-nginx
 ingress_nginx_chart: ingress-nginx/ingress-nginx
 # Поды контроллера только на control plane (taint + nodeSelector). false = поведение чарта по умолчанию
 ingress_nginx_on_control_plane: true
+# Поды Bitrix (и web=1 / HPA off) на CP: то же, что ingress_nginx_on_control_plane, либо явно при master с taint:
+# bitrix_on_control_plane: true
 
 # --- cert-manager ---
 cert_manager_install: true
@@ -76,6 +78,9 @@ letsencrypt_email: admin@example.com
 letsencrypt_cluster_issuer: letsencrypt-prod
 
 bitrix_create_cluster_issuer: true
+# При bitrix_on_control_plane / ingress_nginx_on_control_plane: true — в extra-values tolerations + web=1 и HPA off. Переопределение:
+# bitrix_web_replicas: 3
+# bitrix_hpa_enabled: true
 
 install_nfs_provisioner: true
 install_ingress_nginx: true

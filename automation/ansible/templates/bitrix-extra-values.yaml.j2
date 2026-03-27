@@ -1,9 +1,10 @@
+{% set _bitrix_on_cp = (bitrix_on_control_plane | default(ingress_nginx_on_control_plane | default(false))) | bool %}
 global:
   domain: {{ bitrix_domain | quote }}
   storageClass:
     rwx: {{ bitrix_storage_rwx | quote }}
     rwo: {{ (bitrix_storage_rwo | default(bitrix_storage_rwx, true)) | quote }}
-{% if ingress_nginx_on_control_plane | default(false) | bool %}
+{% if _bitrix_on_cp %}
   nodeSelector:
     node-role.kubernetes.io/control-plane: ""
   tolerations:
@@ -13,6 +14,13 @@ global:
     - key: node-role.kubernetes.io/master
       operator: Exists
       effect: NoSchedule
+{% endif %}
+{% if _bitrix_on_cp %}
+# Одна нода CP: 3×web + HPA часто даёт Pending (insufficient cpu/memory)
+web:
+  replicaCount: {{ bitrix_web_replicas | default(1) | int }}
+hpa:
+  enabled: {{ bitrix_hpa_enabled | default(false) | bool }}
 {% endif %}
 
 createNamespace: false
