@@ -53,6 +53,12 @@ bitrix_on_control_plane: false
 cert_manager_install: true
 cert_manager_namespace: cert-manager
 cert_manager_release: cert-manager
+# Перед Helm Bitrix (ClusterIssuer): ожидание webhook; при таймауте — rollout restart и повтор
+# cert_manager_webhook_wait_timeout: 10m
+# cert_manager_webhook_retry_wait_timeout: 5m
+# Повторы helm upgrade bitrix при ошибке webhook / сети
+# bitrix_helm_retries: 5
+# bitrix_helm_retry_delay: 45
 # Разрешить поды + post-install Job на control-plane (по умолчанию как ingress_nginx_on_control_plane)
 # cert_manager_on_control_plane: true
 

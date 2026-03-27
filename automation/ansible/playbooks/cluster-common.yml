@@ -293,6 +293,72 @@
       register: _bsi
       changed_when: "'deleted' in ((_bsi.stdout | default('')) ~ (_bsi.stderr | default('')))"
 
+    - name: Namespace cert-manager (для ожидания webhook)
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - ns
+          - "{{ cert_manager_namespace | default('cert-manager') }}"
+          - --kubeconfig={{ kubeconfig_local }}
+      register: _cm_ns_ok
+      failed_when: false
+      changed_when: false
+
+    - name: Дождаться cert-manager webhook (ClusterIssuer admission)
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - wait
+          - --kubeconfig={{ kubeconfig_local }}
+          - deployment/cert-manager-webhook
+          - -n
+          - "{{ cert_manager_namespace | default('cert-manager') }}"
+          - --for=condition=Available=True
+          - --timeout={{ cert_manager_webhook_wait_timeout | default('10m') }}
+      when:
+        - cert_manager_install | default(true) | bool
+        - bitrix_create_cluster_issuer | default(true) | bool
+        - _cm_ns_ok.rc == 0
+      register: _cm_wh1
+      failed_when: false
+      changed_when: false
+
+    - name: Перезапуск cert-manager-webhook если не готов к admission
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - rollout
+          - restart
+          - deployment/cert-manager-webhook
+          - -n
+          - "{{ cert_manager_namespace | default('cert-manager') }}"
+          - --kubeconfig={{ kubeconfig_local }}
+      when:
+        - cert_manager_install | default(true) | bool
+        - bitrix_create_cluster_issuer | default(true) | bool
+        - _cm_ns_ok.rc == 0
+        - not (_cm_wh1.skipped | default(false))
+        - (_cm_wh1.rc | default(1)) != 0
+
+    - name: Повторно дождаться cert-manager webhook
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - wait
+          - --kubeconfig={{ kubeconfig_local }}
+          - deployment/cert-manager-webhook
+          - -n
+          - "{{ cert_manager_namespace | default('cert-manager') }}"
+          - --for=condition=Available=True
+          - --timeout={{ cert_manager_webhook_retry_wait_timeout | default('5m') }}
+      when:
+        - cert_manager_install | default(true) | bool
+        - bitrix_create_cluster_issuer | default(true) | bool
+        - _cm_ns_ok.rc == 0
+        - not (_cm_wh1.skipped | default(false))
+        - (_cm_wh1.rc | default(0)) != 0
+
     - name: Helm install / upgrade Bitrix
       ansible.builtin.shell: |
         set -euo pipefail
@@ -307,6 +373,10 @@
         executable: /bin/bash
       environment:
         KUBECONFIG: "{{ kubeconfig_local }}"
+      register: _helm_bitrix
+      until: _helm_bitrix.rc == 0
+      retries: "{{ bitrix_helm_retries | default(5) }}"
+      delay: "{{ bitrix_helm_retry_delay | default(45) }}"
       changed_when: true
 
     - name: Итог
