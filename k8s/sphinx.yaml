@@ -121,7 +121,7 @@ spec:
               mountPath: /var/run/sphinx
       containers:
         - name: sphinx
-          image: bitrix24/sphinx:2.2.11-v2-alpine
+          image: quay.io/bitrix24/sphinx:2.2.11-v2-alpine
           ports:
             - containerPort: 9306
           volumeMounts:

@@ -42,21 +42,21 @@ redis:
   image: redis:8.2.5-alpine
 
 sphinx:
-  image: bitrix24/sphinx:2.2.11-v2-alpine
+  image: quay.io/bitrix24/sphinx:2.2.11-v2-alpine
   pvc:
     size: 5Gi
     storageClassName: ""
   initImage: busybox:1.36
 
 push:
-  image: bitrix24/push:3.2-v1-alpine
+  image: quay.io/bitrix24/push:3.2-v1-alpine
   pub:
     replicas: 1
   sub:
     replicas: 1
 
 images:
-  nginx: bitrix24/nginx:1.28.2-v1-alpine
+  nginx: quay.io/bitrix24/nginx:1.28.2-v1-alpine
   php: quay.io/bitrix24/php:8.2.30-fpm-v1-alpine
   memcached: memcached:1.6.41-alpine
   busybox: busybox:1.36

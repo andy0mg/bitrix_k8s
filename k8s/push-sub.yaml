@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
         - name: push-sub
-          image: bitrix24/push:3.2-v1-alpine
+          image: quay.io/bitrix24/push:3.2-v1-alpine
           ports:
             - containerPort: 8893
           env:

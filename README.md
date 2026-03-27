@@ -44,15 +44,17 @@ Sphinx :9306 ◄──────────────────── php
 
 | Сервис | Образ | Назначение |
 |---|---|---|
-| nginx (sidecar) | `bitrix24/nginx:1.28.2-v1-alpine` | Веб-сервер |
+| nginx (sidecar) | `quay.io/bitrix24/nginx:1.28.2-v1-alpine` | Веб-сервер |
 | php-fpm (sidecar) | `quay.io/bitrix24/php:8.2.30-fpm-v1-alpine` | PHP 8.2 |
 | memcached (sidecar) | `memcached:1.6.41-alpine` | Кеш + сессии |
 | postgres | `postgres:16.13-trixie` | База данных |
 | redis | `redis:8.2.5-alpine` | Транспорт Push |
-| push-pub | `bitrix24/push:3.2-v1-alpine` | Push публикация |
-| push-sub | `bitrix24/push:3.2-v1-alpine` | Push подписка |
-| sphinx | `bitrix24/sphinx:2.2.11-v2-alpine` | Полнотекстовый поиск |
+| push-pub | `quay.io/bitrix24/push:3.2-v1-alpine` | Push публикация |
+| push-sub | `quay.io/bitrix24/push:3.2-v1-alpine` | Push подписка |
+| sphinx | `quay.io/bitrix24/sphinx:2.2.11-v2-alpine` | Полнотекстовый поиск |
 | cronjob | `quay.io/bitrix24/php:8.2.30-fpm-v1-alpine` | Агенты Битрикс |
+
+Образы **`bitrix24/*` с Docker Hub** при анонимном pull часто дают `insufficient_scope`; в чарте и манифестах указан **публичный** реестр **`quay.io/bitrix24/...`** (см. [env-docker](https://github.com/bitrix24/env-docker)).
 
 ### Memcached как кластер
 
@@ -535,9 +537,9 @@ define("BX_TEMPORARY_FILES_DIRECTORY", "/opt/.bx_temp");
 Проверка: `/bitrix/admin/site_checker.php?lang=ru` → вкладка **Работа портала**.
 
 > **Важно:** имена переменных среды push-сервера (`REDIS_ADDR`, `SECURITY_KEY`, `LISTEN_ADDR`, `MODE`)
-> соответствуют образу `bitrix24/push:3.2-v1-alpine`. При несоответствии уточните актуальные имена:
+> соответствуют образу `quay.io/bitrix24/push:3.2-v1-alpine`. При несоответствии уточните актуальные имена:
 > ```bash
-> docker run --rm bitrix24/push:3.2-v1-alpine --help
+> docker run --rm quay.io/bitrix24/push:3.2-v1-alpine --help
 > ```
 
 ### Масштабирование

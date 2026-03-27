@@ -102,7 +102,7 @@ spec:
       containers:
         # --- nginx ---
         - name: nginx
-          image: bitrix24/nginx:1.28.2-v1-alpine
+          image: quay.io/bitrix24/nginx:1.28.2-v1-alpine
           ports:
             - containerPort: 80
           volumeMounts:

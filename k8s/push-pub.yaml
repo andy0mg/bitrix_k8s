@@ -1,7 +1,7 @@
 # Push-сервер режим pub — принимает POST-запросы от PHP для публикации событий.
 # PHP обращается к нему по внутреннему адресу: http://bitrix-push-pub/bitrix/pub/
 # Переменные среды могут потребовать корректировки под фактическую версию образа.
-# Уточнить актуальные имена переменных: docker run --rm bitrix24/push:3.2-v1-alpine --help
+# Уточнить актуальные имена переменных: docker run --rm quay.io/bitrix24/push:3.2-v1-alpine --help
 apiVersion: v1
 kind: Service
 metadata:
@@ -32,7 +32,7 @@ spec:
     spec:
       containers:
         - name: push-pub
-          image: bitrix24/push:3.2-v1-alpine
+          image: quay.io/bitrix24/push:3.2-v1-alpine
           ports:
             - containerPort: 8895
           env:
