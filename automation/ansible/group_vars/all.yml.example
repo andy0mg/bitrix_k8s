@@ -64,6 +64,7 @@ bitrix_domain: portal.example.com
 bitrix_namespace: bitrix
 bitrix_release: bitrix
 bitrix_storage_rwx: "{{ nfs_provisioner_storage_class }}"
+# RWO для Postgres/Sphinx; пусто в шаблоне Ansible = тот же класс, что rwx (иначе без default StorageClass PVC висят Pending)
 bitrix_storage_rwo: ""
 
 ingress_tls_enabled: true

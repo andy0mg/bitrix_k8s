@@ -2,8 +2,17 @@ global:
   domain: {{ bitrix_domain | quote }}
   storageClass:
     rwx: {{ bitrix_storage_rwx | quote }}
-{% if bitrix_storage_rwo is defined and bitrix_storage_rwo | length > 0 %}
-    rwo: {{ bitrix_storage_rwo | quote }}
+    rwo: {{ (bitrix_storage_rwo | default(bitrix_storage_rwx, true)) | quote }}
+{% if ingress_nginx_on_control_plane | default(false) | bool %}
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
 {% endif %}
 
 createNamespace: false

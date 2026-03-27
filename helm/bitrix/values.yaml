@@ -11,8 +11,10 @@ global:
   storageClass:
     # RWX для /opt/www (NFS, Longhorn RWX и т.д.)
     rwx: nfs-client
-    # RWO для postgres / sphinx; пусто — StorageClass по умолчанию кластера
+    # RWO для postgres / sphinx; пусто — StorageClass по умолчанию кластера (без default SC PVC зависнут Pending)
     rwo: ""
+  nodeSelector: {}
+  tolerations: []
 
 secrets:
   postgresUser: bitrix

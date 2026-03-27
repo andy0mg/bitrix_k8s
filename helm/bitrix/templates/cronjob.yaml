@@ -16,6 +16,7 @@ spec:
       activeDeadlineSeconds: 55
       template:
         spec:
+{{- include "bitrix.scheduling" . | nindent 10 }}
           restartPolicy: Never
           securityContext:
             runAsUser: 1000

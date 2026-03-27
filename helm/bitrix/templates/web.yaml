@@ -47,6 +47,7 @@ spec:
         app: bitrix-web
         {{- include "bitrix.labels" . | nindent 8 }}
     spec:
+{{- include "bitrix.scheduling" . | nindent 6 }}
       initContainers:
         {{- if .Values.wwwBootstrap.enabled }}
         - name: fetch-portal-archive

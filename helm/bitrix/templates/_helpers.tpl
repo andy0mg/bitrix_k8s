@@ -54,3 +54,17 @@ Target namespace = release namespace
 {{- define "bitrix.namespace" -}}
 {{- .Release.Namespace }}
 {{- end }}
+
+{{/*
+nodeSelector + tolerations (например control-plane при единственной ноде с taint)
+*/}}
+{{- define "bitrix.scheduling" -}}
+{{- with .Values.global.nodeSelector }}
+nodeSelector:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.global.tolerations }}
+tolerations:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}

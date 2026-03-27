@@ -112,6 +112,7 @@ spec:
         app: sphinx
         {{- include "bitrix.labels" . | nindent 8 }}
     spec:
+{{- include "bitrix.scheduling" . | nindent 6 }}
       initContainers:
         - name: init-dirs
           image: {{ .Values.sphinx.initImage | quote }}

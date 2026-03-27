@@ -47,6 +47,7 @@ spec:
         app: postgres
         {{- include "bitrix.labels" . | nindent 8 }}
     spec:
+{{- include "bitrix.scheduling" . | nindent 6 }}
       containers:
         - name: postgres
           image: {{ .Values.postgres.image | quote }}

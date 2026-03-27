@@ -31,6 +31,7 @@ spec:
         app: push-sub
         {{- include "bitrix.labels" . | nindent 8 }}
     spec:
+{{- include "bitrix.scheduling" . | nindent 6 }}
       containers:
         - name: push-sub
           image: {{ .Values.push.image | quote }}

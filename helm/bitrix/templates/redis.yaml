@@ -30,6 +30,7 @@ spec:
         app: redis
         {{- include "bitrix.labels" . | nindent 8 }}
     spec:
+{{- include "bitrix.scheduling" . | nindent 6 }}
       containers:
         - name: redis
           image: {{ .Values.redis.image | quote }}
