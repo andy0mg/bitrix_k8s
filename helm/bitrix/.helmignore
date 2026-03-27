@@ -1,5 +1,5 @@
 .DS_Store
 .git
 .gitignore
+# Не использовать !README.md вместе с *.md — в Helm 3.20+ ломается загрузка чарта (ложный «Chart.yaml file is missing»), см. helm/helm#31939
 *.md
-!README.md

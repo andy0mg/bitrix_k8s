@@ -281,17 +281,12 @@
         dest: "{{ extra_values_path }}"
         mode: "0644"
 
-    # Сначала helm package → .tgz: часть сборок Helm некорректно грузит локальный каталог (ложный «Chart.yaml missing»)
     - name: Helm install / upgrade Bitrix
       ansible.builtin.shell: |
         set -euo pipefail
-        src="{{ repo_root }}/helm/bitrix"
-        build="{{ repo_root }}/automation/build"
-        test -f "$src/Chart.yaml"
-        helm package "$src" --destination "$build"
-        chart_tgz=$(ls -1t "$build"/bitrix-*.tgz | head -1)
-        test -n "${chart_tgz:-}" && test -f "$chart_tgz"
-        exec helm upgrade --install "{{ bitrix_release }}" "$chart_tgz" \
+        chart="{{ repo_root }}/helm/bitrix"
+        test -f "$chart/Chart.yaml"
+        exec helm upgrade --install "{{ bitrix_release }}" "$chart" \
           --namespace "{{ bitrix_namespace }}" --create-namespace \
           --timeout "{{ helm_install_timeout | default('15m') }}" \
           -f "{{ secrets_path }}" \
