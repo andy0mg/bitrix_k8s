@@ -281,24 +281,19 @@
         dest: "{{ extra_values_path }}"
         mode: "0644"
 
+    # Абсолютный путь к чарту: у части ansible/helm связку chdir+относительный путь чинит некорректно → «Chart.yaml missing»
     - name: Helm install / upgrade Bitrix
-      ansible.builtin.command:
-        argv:
-          - helm
-          - upgrade
-          - --install
-          - "{{ bitrix_release }}"
-          - helm/bitrix
-          - --namespace
-          - "{{ bitrix_namespace }}"
-          - --create-namespace
-          - --timeout
-          - "{{ helm_install_timeout | default('15m') }}"
-          - -f
-          - "{{ secrets_path }}"
-          - -f
-          - "{{ extra_values_path }}"
-        chdir: "{{ repo_root }}"
+      ansible.builtin.shell: |
+        set -euo pipefail
+        chart="{{ repo_root }}/helm/bitrix"
+        test -f "$chart/Chart.yaml"
+        exec helm upgrade --install "{{ bitrix_release }}" "$chart" \
+          --namespace "{{ bitrix_namespace }}" --create-namespace \
+          --timeout "{{ helm_install_timeout | default('15m') }}" \
+          -f "{{ secrets_path }}" \
+          -f "{{ extra_values_path }}"
+      args:
+        executable: /bin/bash
       environment:
         KUBECONFIG: "{{ kubeconfig_local }}"
       changed_when: true
