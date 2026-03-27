@@ -50,6 +50,8 @@ spec:
                   key: PUSH_SECURITY_KEY
             - name: LISTEN_ADDR
               value: "0.0.0.0:8895"
+            - name: PUSH_PUB_MODE
+              value: "1"
             - name: MODE
               value: "pub"
           readinessProbe:

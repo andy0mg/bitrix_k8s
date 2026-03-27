@@ -220,6 +220,8 @@ kubectl get pods -n bitrix
 - **Все поды Bitrix в `Pending`, в Events `untolerated taint … control-plane`** — в **`global.tolerations`** из Helm не попали настройки. **Плейбук / шаблон** `bitrix-extra-values.yaml.j2` по умолчанию включает tolerations (если не заданы **`bitrix_on_control_plane`** и **`ingress_nginx_on_control_plane`** — считается режим одной CP-ноды). Пересоберите **`automation/build/bitrix-extra-values.yaml`**: `ansible-playbook playbooks/cluster-common.yml --tags bitrix` (или ваш плей с Bitrix) и снова **`helm upgrade`**. Вручную: допишите в этот YAML под `global:` блоки **`nodeSelector`** и **`tolerations`** под `node-role.kubernetes.io/control-plane` (см. `all.yml.example`). Если Bitrix должен жить **только на workers** — в `group_vars`: **`bitrix_on_control_plane: false`**. Отдельно: нет **StorageClass** для RWO — в шаблоне **`bitrix_storage_rwo`** по умолчанию как RWX; PVC `Pending` без SC — задайте класс.  
 - **`UPGRADE FAILED: cannot patch "postgres" StatefulSet ... volumeClaimTemplates ... forbidden`** — в Kubernetes **нельзя поменять** `volumeClaimTemplates` у уже созданного StatefulSet. Если Postgres ещё пустой/тест: в `group_vars` задайте **`bitrix_force_storage_reinit: true`**, один раз запустите **`--tags bitrix`**, затем верните **`false`**. Вручную: `kubectl delete statefulset postgres -n bitrix --ignore-not-found` и при необходимости `kubectl delete pvc postgres-data-postgres-0 sphinx-data -n bitrix --ignore-not-found`, снова плей Bitrix.  
 - **Сертификат Let’s Encrypt не выдаётся** — порт **80** с интернета до Ingress и корректный **DNS** на этот IP.
+- **Push в `CrashLoopBackOff`, в логах `PUSH_PUB_MODE or PUSH_SUB_MODE`** — в чарте и `k8s/push-*.yaml` заданы **`PUSH_PUB_MODE=1`** / **`PUSH_SUB_MODE=1`**; после `git pull` снова **`helm upgrade`** (или `kubectl rollout restart deployment/push-pub deployment/push-sub -n bitrix`).
+- **`describe node`: `cpu (100%)` в Requests** — на ноде не остаётся CPU под новые поды; уменьшите **`resources.requests.cpu`** в `values` (web/php/postgres/…) или добавьте **vCPU** / **worker**.
 
 ### 7. Не хотите Ansible — только Helm
 
@@ -537,8 +539,7 @@ define("BX_TEMPORARY_FILES_DIRECTORY", "/opt/.bx_temp");
 Параметры автоматически берутся из `settings-template.php` (блок `pull`).
 Проверка: `/bitrix/admin/site_checker.php?lang=ru` → вкладка **Работа портала**.
 
-> **Важно:** имена переменных среды push-сервера (`REDIS_ADDR`, `SECURITY_KEY`, `LISTEN_ADDR`, `MODE`)
-> соответствуют образу `quay.io/bitrix24/push:3.2-v1-alpine`. При несоответствии уточните актуальные имена:
+> **Важно:** для образа `quay.io/bitrix24/push:3.2-v1-alpine` нужны **`PUSH_PUB_MODE=1`** (deployment pub) и **`PUSH_SUB_MODE=1`** (deployment sub); плюс `REDIS_ADDR`, `REDIS_PASSWORD`, `SECURITY_KEY`, `LISTEN_ADDR`, при необходимости `MODE`. При смене тега уточните актуальные имена:
 > ```bash
 > docker run --rm quay.io/bitrix24/push:3.2-v1-alpine --help
 > ```
