@@ -146,7 +146,7 @@ bash automation/scripts/init-ansible-config.sh
    - `k8s_control` — **одна** ВМ, с неё будет `kubeadm init`. Укажите **`ansible_host`** = её IP.  
    - `k8s_workers` — **остальные** ВМ под приложения (рекомендуется). У каждой свой `ansible_host`.  
    - `nfs_server` — ВМ с NFS (можно отдельная).  
-   - Хост **`ansible_controller`** из примера (`ansible_connection: local`) оставьте: он нужен, чтобы к плеям `hosts: localhost` (Helm/addons) подмешивался `group_vars/all.yml`.  
+   - Группа **`ansible_controller`** с хостом **`deploy`** (`ansible_connection: local`) оставьте как в примере: так inventory валиден для любой версии Ansible; `group_vars` на плеях `localhost` всё равно подгружается через `include_vars` в плейбуке.  
    - Везде один и тот же `ansible_user` (например `ubuntu`), если логин одинаковый.
 
 2. **`automation/ansible/group_vars/all.yml`** (скопирован из примера). Обязательно поменяйте:
