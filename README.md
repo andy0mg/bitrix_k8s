@@ -119,9 +119,12 @@ automation/                 Ansible + скрипты
 - У всех ВМ **статичные IP**, доступ по **SSH** с вашей машины (логин с `sudo` без пароля или знайте пароль sudo).
 - На **вашей машине** (Linux, macOS или **WSL** в Windows): установлены **Git**, **Ansible**, **kubectl**, **Helm**. На Ubuntu/Debian проще всего поставить **ansible-core** из репозитория дистрибутива:
   ```bash
-  sudo apt update && sudo apt install -y git ansible-core
-  # helm и kubectl — по официальным инструкциям с сайтов kubernetes.io / helm.sh
+  sudo apt update && sudo apt install -y git ansible-core curl
+  curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+  sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
   ```
+  На **ARM64** в URL замените `amd64` на `arm64`. Если Ansible запускаете **на отдельной ВМ** (бастионе), поставьте `helm` и `kubectl` **на неё**, а не только на ноды кластера.  
   Нужна более свежая версия Ansible — тогда `pip install --user ansible` (потребуется `python3-pip`).
 - **Домен** для сайта (например `bitrix.company.ru`) желателен для TLS. Пока можно работать по **IP** (см. шаг 9) — Let’s Encrypt по IP не выдаст, тогда в `group_vars/all.yml` отключите TLS для теста или используйте свой сертификат позже.
 

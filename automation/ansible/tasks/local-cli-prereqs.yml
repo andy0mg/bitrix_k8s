@@ -19,9 +19,16 @@
 - name: Нужны helm и kubectl на машине запуска ansible-playbook
   ansible.builtin.fail:
     msg: |
-      Плей выполняется на localhost — в PATH этой машины должны быть helm и kubectl.
+      Плей addons/bitrix идёт на localhost — здесь же должны быть в PATH helm и kubectl.
       Сейчас: helm={{ 'найден' if _helm_bin.rc == 0 else 'НЕТ' }}, kubectl={{ 'найден' if _kubectl_bin.rc == 0 else 'НЕТ' }}.
-      Примеры установки:
+
+      Helm:
         curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-        kubectl — https://kubernetes.io/docs/tasks/tools/ (или пакет kubectl из того же apt, что kubelet на админ-хосте)
+
+      kubectl (Linux x86_64, от root):
+        curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && kubectl version --client
+
+      Для ARM64 замените amd64 → arm64 в URL.
+      Документация: https://kubernetes.io/docs/tasks/tools/
   when: _helm_bin.rc != 0 or _kubectl_bin.rc != 0
