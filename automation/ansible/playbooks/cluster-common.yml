@@ -238,6 +238,18 @@
         msg: "Нужен kubeconfig: {{ kubeconfig_local }}"
       when: not _kc2.stat.exists
 
+    - name: Проверить Helm chart (Chart.yaml)
+      ansible.builtin.stat:
+        path: "{{ helm_chart_dir }}/Chart.yaml"
+      register: _bitrix_chart
+
+    - name: Полный репозиторий с helm/bitrix
+      ansible.builtin.fail:
+        msg: |
+          Нет {{ helm_chart_dir }}/Chart.yaml — для bitrix нужен полный клон репозитория, не только automation/.
+          На этом хосте: cd {{ repo_root }} && git pull && ls helm/bitrix/Chart.yaml
+      when: not _bitrix_chart.stat.exists
+
     - name: Сгенерировать пароль PostgreSQL
       ansible.builtin.command: openssl rand -base64 24
       register: _pg

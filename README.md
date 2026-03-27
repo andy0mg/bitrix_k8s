@@ -174,7 +174,7 @@ cd automation/ansible
 ansible-playbook playbooks/site.yml
 ```
 
-Ansible по очереди: подготовит ноды, **kubeadm init**, сеть **Flannel**, при необходимости **join** workers, положит **`../../automation/build/kubeconfig`**, настроит **NFS**, поставит **ingress / nfs-client provisioner / metrics / cert-manager** и **Helm chart Bitrix**.
+Ansible по очереди: подготовит ноды, **kubeadm init**, сеть **Flannel**, при необходимости **join** workers, положит **`../../automation/build/kubeconfig`**, настроит **NFS**, поставит **ingress / nfs-client provisioner / metrics / cert-manager** и **Helm chart Bitrix**. Плейбуки рассчитывают на **полный клон репозитория** (каталог **`helm/bitrix/`** с `Chart.yaml`), не только `automation/`.
 
 Время — от **15–40 минут**, зависимо от сети и железа.
 
