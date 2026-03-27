@@ -282,13 +282,25 @@
         mode: "0644"
 
     - name: Helm install / upgrade Bitrix
-      ansible.builtin.command: >
-        helm upgrade --install {{ bitrix_release }} {{ helm_chart_dir }}
-        --kubeconfig {{ kubeconfig_local }}
-        --namespace {{ bitrix_namespace }} --create-namespace
-        --timeout {{ helm_install_timeout | default('15m') }}
-        -f {{ secrets_path }}
-        -f {{ extra_values_path }}
+      ansible.builtin.command:
+        argv:
+          - helm
+          - upgrade
+          - --install
+          - "{{ bitrix_release }}"
+          - helm/bitrix
+          - --namespace
+          - "{{ bitrix_namespace }}"
+          - --create-namespace
+          - --timeout
+          - "{{ helm_install_timeout | default('15m') }}"
+          - -f
+          - "{{ secrets_path }}"
+          - -f
+          - "{{ extra_values_path }}"
+      chdir: "{{ repo_root }}"
+      environment:
+        KUBECONFIG: "{{ kubeconfig_local }}"
       changed_when: true
 
     - name: Итог
