@@ -83,6 +83,14 @@
     - name: Применить рестарт containerd при смене конфига
       ansible.builtin.meta: flush_handlers
 
+    - name: NFS-клиент на нодах (mount.nfs для provisioner и PVC)
+      ansible.builtin.apt:
+        name: nfs-common
+        state: present
+      when:
+        - ansible_os_family == "Debian"
+        - install_nfs_common_on_k8s_nodes | default(true) | bool
+
   handlers:
     - name: Restart containerd
       ansible.builtin.systemd:

@@ -19,6 +19,14 @@
         update_cache: true
       when: ansible_os_family == "Debian"
 
+    - name: NFS-клиент на ноде (тома NFS в подах)
+      ansible.builtin.apt:
+        name: nfs-common
+        state: present
+      when:
+        - ansible_os_family == "Debian"
+        - install_nfs_common_on_k8s_nodes | default(true) | bool
+
     - name: Установить k3s server
       ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
       args:
@@ -82,6 +90,14 @@
     k3s_url: "https://{{ hostvars[k3s_primary]['ansible_host'] }}:6443"
     k3s_token: "{{ hostvars[k3s_primary]['k3s_registration_token'] }}"
   tasks:
+    - name: NFS-клиент на ноде (тома NFS в подах)
+      ansible.builtin.apt:
+        name: nfs-common
+        state: present
+      when:
+        - ansible_os_family == "Debian"
+        - install_nfs_common_on_k8s_nodes | default(true) | bool
+
     - name: Установить k3s agent
       ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
       environment:
