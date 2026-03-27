@@ -3,6 +3,11 @@
 all:
   vars:
     ansible_user: ubuntu
+  hosts:
+    # Нужен для плеев с hosts: localhost (addons, bitrix): без него не подгружается group_vars/all.yml
+    ansible_controller:
+      ansible_host: 127.0.0.1
+      ansible_connection: local
   children:
     k8s_control:
       hosts:

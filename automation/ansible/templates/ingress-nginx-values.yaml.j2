@@ -1,0 +1,16 @@
+# Сгенерировано Ansible (ingress_nginx_on_control_plane)
+{% if ingress_nginx_on_control_plane | default(true) | bool %}
+controller:
+  # Только control-plane ноды (иначе с taint под не попадёт без tolerations)
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+{% else %}
+{}
+{% endif %}

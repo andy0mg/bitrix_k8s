@@ -251,6 +251,6 @@
       args:
         creates: /etc/kubernetes/kubelet.conf
       when:
-        - k8s_join_workers | default(false)
+        - k8s_join_workers | default(false) | bool
         - groups['k8s_workers'] is defined
         - (groups['k8s_workers'] | length) > 0

@@ -17,6 +17,10 @@
   vars:
     repo_root: "{{ repo_root_override | default(playbook_dir | dirname | dirname | dirname) }}"
     kubeconfig_local: "{{ repo_root }}/automation/build/kubeconfig"
+  pre_tasks:
+    - name: Подгрузить group_vars/all.yml для localhost
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../group_vars/all.yml"
   tasks:
     - name: Проверить kubeconfig
       ansible.builtin.stat:
@@ -27,6 +31,12 @@
       ansible.builtin.fail:
         msg: "Нет {{ kubeconfig_local }} — сначала плей с тегами kubeadm,kubeconfig или k3s,kubeconfig / положите kubeconfig вручную."
       when: not _kc.stat.exists
+
+    - name: Каталог automation/build
+      ansible.builtin.file:
+        path: "{{ repo_root }}/automation/build"
+        state: directory
+        mode: "0755"
 
     - name: Helm repo ingress-nginx
       ansible.builtin.command: helm repo add ingress-nginx {{ ingress_nginx_repo }}
@@ -65,11 +75,19 @@
       ansible.builtin.command: helm repo update
       changed_when: true
 
+    - name: Шаблон values для ingress-nginx
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/ingress-nginx-values.yaml.j2"
+        dest: "{{ repo_root }}/automation/build/ingress-nginx-values.yaml"
+        mode: "0644"
+      when: install_ingress_nginx | default(true)
+
     - name: Установить ingress-nginx
       ansible.builtin.command: >
         helm upgrade --install {{ ingress_nginx_release }} {{ ingress_nginx_chart }}
         --kubeconfig {{ kubeconfig_local }}
         --namespace ingress-nginx --create-namespace
+        -f {{ repo_root }}/automation/build/ingress-nginx-values.yaml
       when: install_ingress_nginx | default(true)
       changed_when: true
 
@@ -119,6 +137,10 @@
     helm_chart_dir: "{{ repo_root }}/helm/bitrix"
     secrets_path: "{{ repo_root }}/automation/build/bitrix-secrets.yaml"
     extra_values_path: "{{ repo_root }}/automation/build/bitrix-extra-values.yaml"
+  pre_tasks:
+    - name: Подгрузить group_vars/all.yml для localhost
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../group_vars/all.yml"
   tasks:
     - name: Проверить kubeconfig
       ansible.builtin.stat:

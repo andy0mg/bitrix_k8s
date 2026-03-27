@@ -146,6 +146,7 @@ bash automation/scripts/init-ansible-config.sh
    - `k8s_control` — **одна** ВМ, с неё будет `kubeadm init`. Укажите **`ansible_host`** = её IP.  
    - `k8s_workers` — **остальные** ВМ под приложения (рекомендуется). У каждой свой `ansible_host`.  
    - `nfs_server` — ВМ с NFS (можно отдельная).  
+   - Хост **`ansible_controller`** из примера (`ansible_connection: local`) оставьте: он нужен, чтобы к плеям `hosts: localhost` (Helm/addons) подмешивался `group_vars/all.yml`.  
    - Везде один и тот же `ansible_user` (например `ubuntu`), если логин одинаковый.
 
 2. **`automation/ansible/group_vars/all.yml`** (скопирован из примера). Обязательно поменяйте:
@@ -188,7 +189,7 @@ kubectl get pods -n bitrix
 
 ### 5. Как открыть сайт в браузере
 
-- Узнайте IP, на котором висит **Ingress** (часто это IP ноды, где запущен `ingress-nginx-controller`):
+- Узнайте IP, на котором висит **Ingress** (по умолчанию Ansible ставит **ingress-nginx на control-plane** ноды — см. `ingress_nginx_on_control_plane` в `group_vars`):
   ```bash
   kubectl get svc -n ingress-nginx
   ```

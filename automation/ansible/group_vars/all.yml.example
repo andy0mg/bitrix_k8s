@@ -36,6 +36,8 @@ nfs_server_host: "{{ hostvars[groups['nfs_server'][0]]['ansible_host'] }}"
 ingress_nginx_release: ingress-nginx
 ingress_nginx_repo: https://kubernetes.github.io/ingress-nginx
 ingress_nginx_chart: ingress-nginx/ingress-nginx
+# Поды контроллера только на control plane (taint + nodeSelector). false = поведение чарта по умолчанию
+ingress_nginx_on_control_plane: true
 
 # --- cert-manager ---
 cert_manager_install: true
