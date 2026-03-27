@@ -1,0 +1,12 @@
+---
+galaxy_info:
+  role_name: nfs_server
+  author: bitrix_k8s
+  description: NFS server (nfs-kernel-server) для RWX StorageClass в Kubernetes
+  license: MIT
+  min_ansible_version: "2.12"
+  platforms:
+    - name: Debian
+    - name: Ubuntu
+
+dependencies: []

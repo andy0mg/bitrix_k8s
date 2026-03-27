@@ -1,0 +1,4 @@
+---
+- name: Перечитать NFS exports
+  ansible.builtin.command: exportfs -rav
+  changed_when: true

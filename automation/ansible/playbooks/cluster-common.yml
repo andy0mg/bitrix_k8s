@@ -6,36 +6,8 @@
   hosts: nfs_server
   become: true
   tags: [nfs]
-  tasks:
-    - name: Пакет nfs-kernel-server (Debian/Ubuntu)
-      ansible.builtin.apt:
-        name: nfs-kernel-server
-        state: present
-        update_cache: true
-      when: ansible_os_family == "Debian"
-
-    - name: Каталог экспорта
-      ansible.builtin.file:
-        path: "{{ nfs_export_path }}"
-        state: directory
-        mode: "0755"
-
-    - name: Строка в /etc/exports
-      ansible.builtin.lineinfile:
-        path: /etc/exports
-        line: "{{ nfs_exports_line }}"
-        create: true
-        mode: "0644"
-
-    - name: Применить exports
-      ansible.builtin.command: exportfs -rav
-      changed_when: true
-
-    - name: Включить NFS
-      ansible.builtin.systemd:
-        name: nfs-kernel-server
-        state: started
-        enabled: true
+  roles:
+    - nfs_server
 
 - name: Cluster addon’ы (ingress, NFS provisioner, metrics, cert-manager)
   hosts: localhost

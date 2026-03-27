@@ -1,0 +1,28 @@
+---
+- name: Пакет NFS (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ nfs_server_package_debian }}"
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Каталог экспорта
+  ansible.builtin.file:
+    path: "{{ nfs_export_path }}"
+    state: directory
+    mode: "0755"
+
+- name: Строка в /etc/exports
+  ansible.builtin.lineinfile:
+    path: /etc/exports
+    line: "{{ nfs_exports_line }}"
+    create: true
+    mode: "0644"
+  notify: Перечитать NFS exports
+
+- name: Включить NFS
+  ansible.builtin.systemd:
+    name: "{{ nfs_server_service_debian }}"
+    state: started
+    enabled: true
+  when: ansible_os_family == "Debian"

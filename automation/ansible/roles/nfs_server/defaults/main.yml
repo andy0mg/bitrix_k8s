@@ -1,0 +1,7 @@
+---
+# Переопределяются из group_vars / inventory.
+nfs_export_path: /srv/nfs/k8s
+nfs_exports_line: "/srv/nfs/k8s *(rw,sync,no_subtree_check,no_root_squash)"
+
+nfs_server_package_debian: nfs-kernel-server
+nfs_server_service_debian: nfs-kernel-server

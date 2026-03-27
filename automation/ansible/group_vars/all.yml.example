@@ -20,7 +20,7 @@ k8s_join_workers: false
 k3s_disable_traefik: true
 k3s_write_kubeconfig_mode: "644"
 
-# --- NFS ---
+# --- NFS (роль roles/nfs_server, хосты группы nfs_server) ---
 nfs_export_path: /srv/nfs/k8s
 nfs_exports_line: "/srv/nfs/k8s *(rw,sync,no_subtree_check,no_root_squash)"
 

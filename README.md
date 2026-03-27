@@ -100,6 +100,7 @@ automation/                 Ansible + скрипты
 │   │   ├── kubeadm-bootstrap.yml
 │   │   ├── k3s-bootstrap.yml
 │   │   └── cluster-common.yml    # NFS, аддоны, Helm Bitrix
+│   ├── roles/nfs_server/       # NFS (nfs-kernel-server), вызывается из cluster-common.yml
 │   └── templates/
 └── scripts/
     ├── init-ansible-config.sh
