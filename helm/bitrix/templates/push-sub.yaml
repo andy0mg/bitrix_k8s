@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bitrix-push-sub
+  namespace: {{ include "bitrix.namespace" . }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: push-sub
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8893
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: push-sub
+  namespace: {{ include "bitrix.namespace" . }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.push.sub.replicas }}
+  selector:
+    matchLabels:
+      app: push-sub
+  template:
+    metadata:
+      labels:
+        app: push-sub
+        {{- include "bitrix.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: push-sub
+          image: {{ .Values.push.image | quote }}
+          ports:
+            - containerPort: 8893
+          env:
+            - name: REDIS_ADDR
+              value: "redis:6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bitrix.secretName" . }}
+                  key: REDIS_PASSWORD
+            - name: SECURITY_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bitrix.secretName" . }}
+                  key: PUSH_SECURITY_KEY
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:8893"
+            - name: MODE
+              value: "sub"
+          readinessProbe:
+            tcpSocket:
+              port: 8893
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi

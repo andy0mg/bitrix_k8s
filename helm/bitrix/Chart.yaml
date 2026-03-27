@@ -1,0 +1,10 @@
+apiVersion: v2
+name: bitrix
+description: Bitrix24 on Kubernetes (web, PostgreSQL, Redis, Sphinx, Push, cron)
+type: application
+version: 0.1.0
+appVersion: "24.0"
+keywords:
+  - bitrix
+  - bitrix24
+maintainers: []

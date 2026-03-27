@@ -1,0 +1,17 @@
+1. Проверка подов:
+   kubectl get pods -n {{ .Release.Namespace }}
+
+2. Секреты: убедитесь, что заданы пароли и PUSH_SECURITY_KEY ( Helm не валидирует пустые строки ).
+   helm get values {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+3. Первичная установка Битрикс:
+   kubectl exec -it -n {{ .Release.Namespace }} deployment/bitrix-web -c php-fpm -- \
+     wget -P /opt/www https://www.1c-bitrix.ru/download/scripts/bitrixsetup.php
+
+   Откройте http(s)://{{ .Values.global.domain }}/bitrixsetup.php
+
+   БД: хост postgres, пользователь {{ .Values.secrets.postgresUser }}, БД {{ .Values.secrets.postgresDatabase }}.
+
+4. После установки скопируйте k8s/settings-template.php в /opt/www/bitrix/.settings.php и при необходимости обновите домен и ключи.
+
+5. Если используется cert-manager: включите ingress.tls.enabled и аннотацию cluster-issuer; секрет {{ .Values.ingress.tls.secretName }} создастся автоматически.

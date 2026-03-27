@@ -1,0 +1,64 @@
+# Push-сервер режим sub — держит long-polling/WebSocket соединения с браузерами.
+# Трафик приходит через Ingress по пути /bitrix/sub/.
+# Для корректной работы WebSocket Ingress должен передавать заголовки Upgrade/Connection.
+apiVersion: v1
+kind: Service
+metadata:
+  name: bitrix-push-sub
+  namespace: bitrix
+spec:
+  selector:
+    app: push-sub
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8893
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: push-sub
+  namespace: bitrix
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: push-sub
+  template:
+    metadata:
+      labels:
+        app: push-sub
+    spec:
+      containers:
+        - name: push-sub
+          image: bitrix24/push:3.2-v1-alpine
+          ports:
+            - containerPort: 8893
+          env:
+            - name: REDIS_ADDR
+              value: "redis:6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bitrix
+                  key: REDIS_PASSWORD
+            - name: SECURITY_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bitrix
+                  key: PUSH_SECURITY_KEY
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:8893"
+            - name: MODE
+              value: "sub"
+          readinessProbe:
+            tcpSocket:
+              port: 8893
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi

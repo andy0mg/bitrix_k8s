@@ -1,0 +1,9 @@
+{{- if .Values.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "bitrix.namespace" . }}
+  labels:
+    app.kubernetes.io/name: bitrix
+    {{- include "bitrix.labels" . | nindent 4 }}
+{{- end }}

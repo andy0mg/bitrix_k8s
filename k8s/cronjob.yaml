@@ -1,0 +1,55 @@
+# CronJob запускает обработку агентов Битрикс раз в минуту — единственный экземпляр,
+# что исключает дублирование задач при нескольких веб-репликах.
+# Перед использованием добавьте в /opt/www/bitrix/php_interface/dbconn.php:
+#   define("BX_CRONTAB_SUPPORT", true);
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bitrix-cron
+  namespace: bitrix
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 55
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+          containers:
+            - name: cron
+              image: quay.io/bitrix24/php:8.2.30-fpm-v1-alpine
+              command:
+                - php
+                - -f
+                - /opt/www/bitrix/modules/main/tools/cron_events.php
+              env:
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: bitrix
+                      key: POSTGRES_PASSWORD
+              volumeMounts:
+                - name: www-data
+                  mountPath: /opt/www
+                - name: php-config
+                  mountPath: /usr/local/etc/php/conf.d/99-bitrix.ini
+                  subPath: 99-bitrix.ini
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+          volumes:
+            - name: www-data
+              persistentVolumeClaim:
+                claimName: bitrix-www
+            - name: php-config
+              configMap:
+                name: php-config

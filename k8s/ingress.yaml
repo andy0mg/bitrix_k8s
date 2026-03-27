@@ -1,0 +1,49 @@
+# Ingress требует установленного Ingress-контроллера (например, ingress-nginx).
+# Замените YOUR_DOMAIN на ваше доменное имя.
+# TLS-секрет bitrix-tls должен быть создан заранее (cert-manager или вручную).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bitrix
+  namespace: bitrix
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "1024m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    # WebSocket для push-sub
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - YOUR_DOMAIN
+      secretName: bitrix-tls
+  rules:
+    - host: YOUR_DOMAIN
+      http:
+        paths:
+          # Push-sub: SSE / WebSocket от браузеров
+          - path: /bitrix/sub/
+            pathType: Prefix
+            backend:
+              service:
+                name: bitrix-push-sub
+                port:
+                  number: 80
+          # Push-pub: публикация событий (внутренний трафик от PHP)
+          - path: /bitrix/pub/
+            pathType: Prefix
+            backend:
+              service:
+                name: bitrix-push-pub
+                port:
+                  number: 80
+          # Весь остальной трафик — на веб-поды
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: bitrix-web
+                port:
+                  number: 80

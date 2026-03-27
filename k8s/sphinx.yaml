@@ -1,0 +1,158 @@
+# sphinx.conf монтируется через ConfigMap.
+# После первого деплоя необходимо запустить индексацию из панели Битрикс:
+#   /bitrix/admin/search_reindex.php?lang=ru
+# или вручную внутри пода: searchd --config /etc/sphinx/sphinx.conf --index bitrix
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sphinx-config
+  namespace: bitrix
+data:
+  sphinx.conf: |
+    source bitrix_src
+    {
+        type            = pgsql
+        sql_host        = postgres
+        sql_port        = 5432
+        sql_db          = bitrix
+        sql_user        = bitrix
+        sql_pass        = CHANGE_ME_POSTGRES_PASSWORD
+
+        sql_query_pre   = SET NAMES utf8
+        sql_query       = \
+            SELECT id, title, body, site_id, module_id, item_id, \
+                   param1, param2, EXTRACT(EPOCH FROM date_change)::int AS date_change, \
+                   custom_rank \
+            FROM b_search_content
+
+        sql_attr_string     = site_id
+        sql_attr_string     = module_id
+        sql_attr_string     = item_id
+        sql_attr_string     = param1
+        sql_attr_string     = param2
+        sql_attr_uint       = custom_rank
+        sql_attr_timestamp  = date_change
+    }
+
+    index bitrix
+    {
+        source          = bitrix_src
+        path            = /var/lib/sphinx/data/bitrix
+        morphology      = stem_ru, stem_en
+        min_word_len    = 2
+        html_strip      = 1
+        infix_fields    = title, body
+        min_infix_len   = 2
+        charset_table   = 0..9, A..Z->a..z, _, a..z, \
+            U+410..U+42F->U+430..U+44F, U+430..U+44F
+    }
+
+    indexer
+    {
+        mem_limit       = 256M
+    }
+
+    searchd
+    {
+        listen          = 0.0.0.0:9306:mysql41
+        log             = /var/log/sphinx/searchd.log
+        query_log       = /var/log/sphinx/query.log
+        pid_file        = /var/run/sphinx/searchd.pid
+        max_children    = 30
+        seamless_rotate = 1
+        preopen_indexes = 1
+        unlink_old      = 1
+    }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sphinx-data
+  namespace: bitrix
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sphinx
+  namespace: bitrix
+spec:
+  selector:
+    app: sphinx
+  ports:
+    - port: 9306
+      targetPort: 9306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sphinx
+  namespace: bitrix
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sphinx
+  template:
+    metadata:
+      labels:
+        app: sphinx
+    spec:
+      initContainers:
+        - name: init-dirs
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /var/lib/sphinx/data /var/log/sphinx /var/run/sphinx
+              chown -R 101:101 /var/lib/sphinx /var/log/sphinx /var/run/sphinx
+          volumeMounts:
+            - name: sphinx-data
+              mountPath: /var/lib/sphinx
+            - name: sphinx-log
+              mountPath: /var/log/sphinx
+            - name: sphinx-run
+              mountPath: /var/run/sphinx
+      containers:
+        - name: sphinx
+          image: bitrix24/sphinx:2.2.11-v2-alpine
+          ports:
+            - containerPort: 9306
+          volumeMounts:
+            - name: sphinx-config
+              mountPath: /etc/sphinx/sphinx.conf
+              subPath: sphinx.conf
+            - name: sphinx-data
+              mountPath: /var/lib/sphinx
+            - name: sphinx-log
+              mountPath: /var/log/sphinx
+            - name: sphinx-run
+              mountPath: /var/run/sphinx
+          readinessProbe:
+            tcpSocket:
+              port: 9306
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+      volumes:
+        - name: sphinx-config
+          configMap:
+            name: sphinx-config
+        - name: sphinx-data
+          persistentVolumeClaim:
+            claimName: sphinx-data
+        - name: sphinx-log
+          emptyDir: {}
+        - name: sphinx-run
+          emptyDir: {}

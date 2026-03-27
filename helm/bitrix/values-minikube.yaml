@@ -1,0 +1,27 @@
+# Локальная разработка: minikube + один веб-под + RWO + без TLS
+# Пример: helm install bitrix . -n bitrix --create-namespace -f values-minikube.yaml --set global.domain="$(minikube ip).nip.io"
+
+global:
+  domain: minikube.local
+  storageClass:
+    rwx: standard
+    rwo: standard
+
+pvc:
+  www:
+    accessMode: ReadWriteOnce
+
+web:
+  replicaCount: 1
+
+hpa:
+  enabled: false
+
+ingress:
+  tls:
+    enabled: false
+    certManager:
+      enabled: false
+
+certManager:
+  createClusterIssuer: false

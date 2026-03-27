@@ -1,0 +1,16 @@
+---
+# cp inventory/hosts.yml.example inventory/hosts.yml
+all:
+  vars:
+    ansible_user: ubuntu
+  children:
+    k3s_control:
+      hosts:
+        k3s-1:
+          ansible_host: 10.0.0.10
+    k3s_workers:
+      hosts: {}
+    nfs_server:
+      hosts:
+        nfs-1:
+          ansible_host: 10.0.0.11

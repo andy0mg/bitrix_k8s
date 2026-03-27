@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: php-config
+  namespace: {{ include "bitrix.namespace" . }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+data:
+  99-bitrix.ini: |
+    ; Лимиты загрузки файлов
+    upload_max_filesize = 1024M
+    post_max_size = 1024M
+
+    ; Таймауты выполнения
+    max_execution_time = 300
+    max_input_time = 300
+
+    ; Память
+    memory_limit = 256M
+
+    ; Часовой пояс
+    date.timezone = Europe/Moscow
+
+    ; Сессии управляются Битрикс через .settings.php, не через php.ini
+    session.save_handler = files
+    session.save_path = /tmp
+
+    ; Отключаем вывод ошибок в ответ (логи — в контейнер stderr)
+    display_errors = Off
+    log_errors = On
+    error_log = /proc/self/fd/2
+
+    ; OPcache
+    opcache.enable = 1
+    opcache.memory_consumption = 128
+    opcache.interned_strings_buffer = 8
+    opcache.max_accelerated_files = 10000
+    opcache.revalidate_freq = 2
+    opcache.fast_shutdown = 1

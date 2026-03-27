@@ -1,0 +1,125 @@
+# Установка: helm install bitrix . -n bitrix --create-namespace
+# Секреты обязательно передайте через --set или отдельный файл (см. README).
+
+createNamespace: false
+nameOverride: ""
+fullnameOverride: ""
+secretNameOverride: ""
+
+global:
+  domain: example.com
+  storageClass:
+    # RWX для /opt/www (NFS, Longhorn RWX и т.д.)
+    rwx: nfs-client
+    # RWO для postgres / sphinx; пусто — StorageClass по умолчанию кластера
+    rwo: ""
+
+secrets:
+  postgresUser: bitrix
+  postgresDatabase: bitrix
+  postgresPassword: ""
+  redisPassword: ""
+  # 128 символов для Push
+  pushSecurityKey: ""
+
+pvc:
+  www:
+    name: bitrix-www
+    size: 20Gi
+    accessMode: ReadWriteMany
+
+postgres:
+  image: postgres:16.13-trixie
+  replicas: 1
+  storage:
+    size: 50Gi
+    # Подставляется global.storageClass.rwo, если storageClassName ниже
+    storageClassName: ""
+
+redis:
+  image: redis:8.2.5-alpine
+
+sphinx:
+  image: bitrix24/sphinx:2.2.11-v2-alpine
+  pvc:
+    size: 5Gi
+    storageClassName: ""
+  initImage: busybox:1.36
+
+push:
+  image: bitrix24/push:3.2-v1-alpine
+  pub:
+    replicas: 1
+  sub:
+    replicas: 1
+
+images:
+  nginx: bitrix24/nginx:1.28.2-v1-alpine
+  php: quay.io/bitrix24/php:8.2.30-fpm-v1-alpine
+  memcached: memcached:1.6.41-alpine
+  busybox: busybox:1.36
+
+web:
+  replicaCount: 3
+  resources:
+    nginx:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+    php:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+    memcached:
+      requests:
+        cpu: 50m
+        memory: 280Mi
+      limits:
+        memory: 512Mi
+
+hpa:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "1024m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+  tls:
+    enabled: true
+    secretName: bitrix-tls
+    certManager:
+      enabled: false
+      # Имя ClusterIssuer (должен существовать или создаваться chart’ом)
+      clusterIssuer: letsencrypt-prod
+
+# Создать ClusterIssuer для Let's Encrypt (cluster-wide).
+# Имя должно совпадать с ingress.tls.certManager.clusterIssuer.
+certManager:
+  createClusterIssuer: false
+  clusterIssuer:
+    name: letsencrypt-prod
+    email: admin@example.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+
+cronjob:
+  enabled: true
+  schedule: "* * * * *"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi

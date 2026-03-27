@@ -1,0 +1,26 @@
+global:
+  domain: {{ bitrix_domain | quote }}
+  storageClass:
+    rwx: {{ bitrix_storage_rwx | quote }}
+{% if bitrix_storage_rwo is defined and bitrix_storage_rwo | length > 0 %}
+    rwo: {{ bitrix_storage_rwo | quote }}
+{% endif %}
+
+createNamespace: false
+
+ingress:
+  enabled: true
+  className: nginx
+  tls:
+    enabled: {{ ingress_tls_enabled | bool }}
+    secretName: {{ ingress_tls_secret | quote }}
+    certManager:
+      enabled: {{ ingress_cert_manager_annotation | bool }}
+      clusterIssuer: {{ letsencrypt_cluster_issuer | quote }}
+
+certManager:
+  createClusterIssuer: {{ bitrix_create_cluster_issuer | bool }}
+  clusterIssuer:
+    name: {{ letsencrypt_cluster_issuer | quote }}
+    email: {{ letsencrypt_email | quote }}
+    server: https://acme-v02.api.letsencrypt.org/directory

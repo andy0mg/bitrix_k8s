@@ -1,0 +1,9 @@
+# Секреты и kubeconfig из автоматизации
+automation/build/**
+!automation/build/.gitkeep
+**/secrets-local.yaml
+**/bitrix-secrets.yaml
+**/group_vars/all.yml
+automation/ansible/inventory/hosts.yml
+kubeconfig
+*.pem

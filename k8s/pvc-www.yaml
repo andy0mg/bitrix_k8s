@@ -1,0 +1,15 @@
+# PVC для файлов сайта (/opt/www) — должен поддерживать ReadWriteMany.
+# Укажите storageClassName, соответствующий RWX-провайдеру вашего кластера:
+#   nfs-client, cephfs, longhorn-rwx, azurefiles, efs-sc и т.д.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bitrix-www
+  namespace: bitrix
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: "CHANGE_ME_RWX_STORAGECLASS"
+  resources:
+    requests:
+      storage: 20Gi

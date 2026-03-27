@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bitrix-web
+  namespace: {{ include "bitrix.namespace" . }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: bitrix-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: memcached-headless
+  namespace: {{ include "bitrix.namespace" . }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    app: bitrix-web
+  ports:
+    - name: memcached
+      port: 11211
+      targetPort: 11211
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bitrix-web
+  namespace: {{ include "bitrix.namespace" . }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicaCount }}
+  selector:
+    matchLabels:
+      app: bitrix-web
+  template:
+    metadata:
+      labels:
+        app: bitrix-web
+        {{- include "bitrix.labels" . | nindent 8 }}
+    spec:
+      initContainers:
+        - name: init-permissions
+          image: {{ .Values.images.busybox | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /opt/www
+              chown -R 1000:1000 /opt/www
+          volumeMounts:
+            - name: www-data
+              mountPath: /opt/www
+          securityContext:
+            runAsUser: 0
+
+      containers:
+        - name: nginx
+          image: {{ .Values.images.nginx | quote }}
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: www-data
+              mountPath: /opt/www
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.web.resources.nginx | nindent 12 }}
+
+        - name: php-fpm
+          image: {{ .Values.images.php | quote }}
+          ports:
+            - containerPort: 9000
+          volumeMounts:
+            - name: www-data
+              mountPath: /opt/www
+            - name: php-config
+              mountPath: /usr/local/etc/php/conf.d/99-bitrix.ini
+              subPath: 99-bitrix.ini
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "bitrix.secretName" . }}
+                  key: POSTGRES_PASSWORD
+          readinessProbe:
+            tcpSocket:
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.web.resources.php | nindent 12 }}
+
+        - name: memcached
+          image: {{ .Values.images.memcached | quote }}
+          ports:
+            - containerPort: 11211
+          args: ["-m", "256", "-t", "4", "-I", "64m"]
+          readinessProbe:
+            tcpSocket:
+              port: 11211
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.web.resources.memcached | nindent 12 }}
+
+      volumes:
+        - name: www-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.pvc.www.name }}
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+        - name: php-config
+          configMap:
+            name: php-config

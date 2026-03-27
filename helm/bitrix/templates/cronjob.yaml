@@ -1,0 +1,51 @@
+{{- if .Values.cronjob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bitrix-cron
+  namespace: {{ include "bitrix.namespace" . }}
+  labels:
+    {{- include "bitrix.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cronjob.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 55
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+          containers:
+            - name: cron
+              image: {{ .Values.images.php | quote }}
+              command:
+                - php
+                - -f
+                - /opt/www/bitrix/modules/main/tools/cron_events.php
+              env:
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "bitrix.secretName" . }}
+                      key: POSTGRES_PASSWORD
+              volumeMounts:
+                - name: www-data
+                  mountPath: /opt/www
+                - name: php-config
+                  mountPath: /usr/local/etc/php/conf.d/99-bitrix.ini
+                  subPath: 99-bitrix.ini
+              resources:
+                {{- toYaml .Values.cronjob.resources | nindent 16 }}
+          volumes:
+            - name: www-data
+              persistentVolumeClaim:
+                claimName: {{ .Values.pvc.www.name }}
+            - name: php-config
+              configMap:
+                name: php-config
+{{- end }}

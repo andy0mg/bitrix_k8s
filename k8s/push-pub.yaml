@@ -1,0 +1,65 @@
+# Push-сервер режим pub — принимает POST-запросы от PHP для публикации событий.
+# PHP обращается к нему по внутреннему адресу: http://bitrix-push-pub/bitrix/pub/
+# Переменные среды могут потребовать корректировки под фактическую версию образа.
+# Уточнить актуальные имена переменных: docker run --rm bitrix24/push:3.2-v1-alpine --help
+apiVersion: v1
+kind: Service
+metadata:
+  name: bitrix-push-pub
+  namespace: bitrix
+spec:
+  selector:
+    app: push-pub
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8895
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: push-pub
+  namespace: bitrix
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: push-pub
+  template:
+    metadata:
+      labels:
+        app: push-pub
+    spec:
+      containers:
+        - name: push-pub
+          image: bitrix24/push:3.2-v1-alpine
+          ports:
+            - containerPort: 8895
+          env:
+            - name: REDIS_ADDR
+              value: "redis:6379"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bitrix
+                  key: REDIS_PASSWORD
+            - name: SECURITY_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bitrix
+                  key: PUSH_SECURITY_KEY
+            - name: LISTEN_ADDR
+              value: "0.0.0.0:8895"
+            - name: MODE
+              value: "pub"
+          readinessProbe:
+            tcpSocket:
+              port: 8895
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
