@@ -1,5 +1,5 @@
-{# Если обе переменные не заданы — true (типичный одиночный kubeadm с taint на master). Для Bitrix только на workers: bitrix_on_control_plane: false #}
-{% set _bitrix_on_cp = (bitrix_on_control_plane | default(ingress_nginx_on_control_plane | default(true))) | bool %}
+{# Только явный bitrix_on_control_plane: true — Bitrix на master (taint). Ingress на CP (ingress_nginx_on_control_plane) сюда НЕ входит: при workers поды идут на workers. #}
+{% set _bitrix_on_cp = (bitrix_on_control_plane | default(false)) | bool %}
 global:
   domain: {{ bitrix_domain | quote }}
   storageClass:

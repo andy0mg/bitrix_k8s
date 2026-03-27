@@ -3,7 +3,7 @@
 # Использование:
 #   export KUBECONFIG=/path/to/kubeconfig
 #   LE_EMAIL=you@example.com ./helm-deploy-from-kubeconfig.sh portal.example.com
-# Одна нода с taint на master (по умолчанию): tolerations в extra-values. Отключить: BITRIX_ON_CONTROL_PLANE=false
+# Только если Bitrix должен на master (нет workers): BITRIX_ON_CONTROL_PLANE=true
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DOMAIN="${1:?Укажите домен FQDN, например portal.example.com}"
@@ -12,7 +12,7 @@ REL="${REL:-bitrix}"
 RWX="${RWX:-nfs-client}"
 RWO="${RWO:-}"
 : "${LE_EMAIL:=admin@example.com}"
-: "${BITRIX_ON_CONTROL_PLANE:=true}"
+: "${BITRIX_ON_CONTROL_PLANE:=false}"
 
 if ! command -v helm >/dev/null 2>&1; then
   echo "Нужен helm в PATH" >&2
