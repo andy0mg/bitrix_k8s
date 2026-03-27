@@ -117,6 +117,7 @@
         helm upgrade --install {{ ingress_nginx_release }} {{ ingress_nginx_chart }}
         --kubeconfig {{ kubeconfig_local }}
         --namespace ingress-nginx --create-namespace
+        --timeout {{ helm_install_timeout | default('15m') }}
         -f {{ repo_root }}/automation/build/ingress-nginx-values.yaml
       when: install_ingress_nginx | default(true)
       changed_when: true
@@ -125,6 +126,7 @@
       ansible.builtin.command: >
         helm upgrade --install {{ nfs_provisioner_release }} {{ nfs_provisioner_chart }}
         --kubeconfig {{ kubeconfig_local }}
+        --timeout {{ helm_install_timeout | default('15m') }}
         --set nfs.server={{ nfs_server_host }}
         --set nfs.path={{ nfs_export_path }}
         --set storageClass.name={{ nfs_provisioner_storage_class }}
@@ -152,6 +154,7 @@
         helm upgrade --install {{ cert_manager_release }} jetstack/cert-manager
         --kubeconfig {{ kubeconfig_local }}
         --namespace {{ cert_manager_namespace }} --create-namespace
+        --timeout {{ helm_install_timeout | default('15m') }}
         --set installCRDs=true
       when: cert_manager_install | default(true)
       changed_when: true
@@ -220,6 +223,7 @@
         helm upgrade --install {{ bitrix_release }} {{ helm_chart_dir }}
         --kubeconfig {{ kubeconfig_local }}
         --namespace {{ bitrix_namespace }} --create-namespace
+        --timeout {{ helm_install_timeout | default('15m') }}
         -f {{ secrets_path }}
         -f {{ extra_values_path }}
       changed_when: true

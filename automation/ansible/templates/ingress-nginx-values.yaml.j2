@@ -11,6 +11,18 @@ controller:
     - key: node-role.kubernetes.io/master
       operator: Exists
       effect: NoSchedule
+  # Helm ждёт pre-install Job патча webhook; без tolerations Job висит в Pending на закинутом master
+  admissionWebhooks:
+    patch:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
 {% else %}
 {}
 {% endif %}

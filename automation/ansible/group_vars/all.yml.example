@@ -32,6 +32,9 @@ nfs_provisioner_storage_class: nfs-client
 
 nfs_server_host: "{{ hostvars[groups['nfs_server'][0]]['ansible_host'] }}"
 
+# Таймаут helm для install/upgrade (ждёт hook Job’ы, например admission ingress-nginx)
+helm_install_timeout: 15m
+
 # --- ingress-nginx ---
 ingress_nginx_release: ingress-nginx
 ingress_nginx_repo: https://kubernetes.github.io/ingress-nginx
