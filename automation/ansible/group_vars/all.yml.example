@@ -66,6 +66,8 @@ bitrix_release: bitrix
 bitrix_storage_rwx: "{{ nfs_provisioner_storage_class }}"
 # RWO для Postgres/Sphinx; пусто в шаблоне Ansible = тот же класс, что rwx (иначе без default StorageClass PVC висят Pending)
 bitrix_storage_rwo: ""
+# Одноразово true, если helm upgrade падает на postgres StatefulSet (нельзя менять volumeClaimTemplates): удалятся STS и PVC postgres/sphinx — данные БД/Sphinx пропадут
+# bitrix_force_storage_reinit: true
 
 ingress_tls_enabled: true
 ingress_tls_secret: bitrix-tls

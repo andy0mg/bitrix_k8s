@@ -281,6 +281,18 @@
         dest: "{{ extra_values_path }}"
         mode: "0644"
 
+    - name: Пересоздать Postgres STS и PVC после смены storageClass в шаблоне
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export KUBECONFIG="{{ kubeconfig_local }}"
+        kubectl delete statefulset postgres -n "{{ bitrix_namespace }}" --ignore-not-found
+        kubectl delete pvc postgres-data-postgres-0 sphinx-data -n "{{ bitrix_namespace }}" --ignore-not-found
+      args:
+        executable: /bin/bash
+      when: bitrix_force_storage_reinit | default(false) | bool
+      register: _bsi
+      changed_when: "'deleted' in ((_bsi.stdout | default('')) ~ (_bsi.stderr | default('')))"
+
     - name: Helm install / upgrade Bitrix
       ansible.builtin.shell: |
         set -euo pipefail
