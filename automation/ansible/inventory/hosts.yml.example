@@ -4,13 +4,17 @@ all:
   vars:
     ansible_user: ubuntu
   children:
-    k3s_control:
+    k8s_control:
       hosts:
-        k3s-1:
+        cp-1:
           ansible_host: 10.0.0.10
-    k3s_workers:
-      hosts: {}
+    k8s_workers:
+      hosts:
+        worker-1:
+          ansible_host: 10.0.0.11
+        worker-2:
+          ansible_host: 10.0.0.12
     nfs_server:
       hosts:
         nfs-1:
-          ansible_host: 10.0.0.11
+          ansible_host: 10.0.0.20

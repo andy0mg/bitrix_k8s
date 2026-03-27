@@ -1,26 +1,35 @@
 ---
 # Скопируйте в group_vars/all.yml (файл в .gitignore).
-# Корень репозитория вычисляется в плейбуках; при необходимости задайте явно:
-# repo_root_override: "/path/to/bitrix_k8s"
 
-# --- k3s ---
+# --- Kubernetes (kubeadm, playbooks/site.yml) ---
+kubernetes_apt_major: "1.29"
+kubeadm_pod_network_cidr: 10.244.0.0/16
+# IP первой control plane для API (часто совпадает с ansible_host этой ВМ)
+kubeadm_apiserver_advertise_address: ""
+# Пусто = одиночный master. HA: VIP или DNS:6443, затем остальные CP — вручную kubeadm join --control-plane
+kubeadm_control_plane_endpoint: ""
+# Адрес в kubeconfig на вашей машине (если kubectl снаружи кластера)
+kubeadm_kubeconfig_public_address: ""
+# Манифест CNI (по умолчанию Flannel под pod CIDR 10.244.0.0/16)
+# kubernetes_cni_manifest_url: https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+
+# Подключать worker-ноды из группы k8s_workers (kubeadm join / k3s agent)
+k8s_join_workers: false
+
+# --- k3s (только playbooks/site-k3s.yml) ---
 k3s_disable_traefik: true
 k3s_write_kubeconfig_mode: "644"
-# Подключать worker-ноды (нужны группы k3s_workers с хостами)
-k3s_join_workers: false
 
-# --- NFS (роль nfs_server) ---
+# --- NFS ---
 nfs_export_path: /srv/nfs/k8s
-# Внимание: "*" открывает экспорт для всех; для прод ограничьте подсеть кластера.
 nfs_exports_line: "/srv/nfs/k8s *(rw,sync,no_subtree_check,no_root_squash)"
 
-# --- NFS provisioner в Kubernetes ---
+# --- NFS provisioner ---
 nfs_provisioner_release: nfs-subdir-external-provisioner
 nfs_provisioner_repo: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
 nfs_provisioner_chart: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
 nfs_provisioner_storage_class: nfs-client
 
-# Адрес NFS для CSI (IP или DNS ВМ с NFS)
 nfs_server_host: "{{ hostvars[groups['nfs_server'][0]]['ansible_host'] }}"
 
 # --- ingress-nginx ---
@@ -33,8 +42,8 @@ cert_manager_install: true
 cert_manager_namespace: cert-manager
 cert_manager_release: cert-manager
 
-# --- metrics-server (дамп для k3s: часто нужен insecure kubelet) ---
-metrics_server_patch_kubelet_insecure_tls: true
+# Для kubeadm обычно не нужен; для k3s часто true
+metrics_server_patch_kubelet_insecure_tls: false
 
 # --- Bitrix Helm ---
 bitrix_domain: portal.example.com
@@ -43,14 +52,12 @@ bitrix_release: bitrix
 bitrix_storage_rwx: "{{ nfs_provisioner_storage_class }}"
 bitrix_storage_rwo: ""
 
-# TLS: ручной секрет bitrix-tls в namespace (если false и без cert-manager — выставьте ingress_tls_enabled: false)
 ingress_tls_enabled: true
 ingress_tls_secret: bitrix-tls
 ingress_cert_manager_annotation: true
 letsencrypt_email: admin@example.com
 letsencrypt_cluster_issuer: letsencrypt-prod
 
-# Чарт сам создаст ClusterIssuer и аннотацию Ingress, если:
 bitrix_create_cluster_issuer: true
 
 install_nfs_provisioner: true

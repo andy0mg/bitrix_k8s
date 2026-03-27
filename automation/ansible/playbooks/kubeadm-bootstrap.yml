@@ -1,0 +1,256 @@
+---
+# Kubernetes (kubeadm). Первая нода в k8s_control — инициализация control plane.
+# HA: задайте kubeadm_control_plane_endpoint (VIP или DNS:6443) и добавьте остальные CP вручную: kubeadm join --control-plane.
+
+- name: Подготовить узлы (containerd + kubelet + kubeadm)
+  hosts: k8s_control:k8s_workers
+  become: true
+  tags: [kubeadm, kubeadm_prepare]
+  tasks:
+    - name: Выключить swap
+      ansible.builtin.command: swapoff -a
+      when: ansible_swaptotal_mb | default(0) | int > 0
+      changed_when: true
+      failed_when: false
+
+    - name: Убрать swap из fstab
+      ansible.builtin.replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+sw\s+)'
+        replace: '# \1'
+        backup: true
+
+    - name: Загрузить br_netfilter
+      ansible.builtin.command: modprobe br_netfilter
+      changed_when: true
+      failed_when: false
+
+    - name: br_netfilter при загрузке
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          br_netfilter
+        mode: "0644"
+
+    - name: Sysctl для Kubernetes (CRI)
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-kubernetes-cri.conf
+        mode: "0644"
+        content: |
+          net.bridge.bridge-nf-call-iptables  = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward                 = 1
+
+    - name: Применить sysctl
+      ansible.builtin.command: sysctl --system
+      changed_when: false
+      failed_when: false
+
+    - name: Установить containerd
+      ansible.builtin.apt:
+        name: containerd
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Каталог containerd
+      ansible.builtin.file:
+        path: /etc/containerd
+        state: directory
+        mode: "0755"
+
+    - name: Проверить SystemdCgroup в containerd
+      ansible.builtin.command: grep -q 'SystemdCgroup = true' /etc/containerd/config.toml
+      register: _ctd_check
+      changed_when: false
+      failed_when: false
+
+    - name: Сгенерировать конфиг containerd с systemd cgroup
+      ansible.builtin.shell: |
+        set -euo pipefail
+        containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' > /etc/containerd/config.toml
+      args:
+        executable: /bin/bash
+      when: _ctd_check.rc != 0
+      notify: Restart containerd
+
+    - name: Включить containerd
+      ansible.builtin.systemd:
+        name: containerd
+        state: started
+        enabled: true
+
+    - name: Применить рестарт containerd при смене конфига
+      ansible.builtin.meta: flush_handlers
+
+  handlers:
+    - name: Restart containerd
+      ansible.builtin.systemd:
+        name: containerd
+        state: restarted
+
+- name: Репозиторий и пакеты Kubernetes
+  hosts: k8s_control:k8s_workers
+  become: true
+  tags: [kubeadm, kubeadm_packages]
+  tasks:
+    - name: Зависимости apt
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gpg
+          - gnupg
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Каталог keyring
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Ключ apt Kubernetes
+      ansible.builtin.get_url:
+        url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_apt_major | default('1.29') }}/deb/Release.key"
+        dest: /tmp/kubernetes-release.key
+        mode: "0644"
+
+    - name: Импорт ключа
+      ansible.builtin.shell: |
+        gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg < /tmp/kubernetes-release.key
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    - name: Список apt Kubernetes
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_apt_major | default('1.29') }}/deb/ /"
+        filename: kubernetes
+        state: present
+
+    - name: Установить kubelet kubeadm kubectl
+      ansible.builtin.apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+        update_cache: true
+
+    - name: Зафиксировать версии (hold)
+      ansible.builtin.shell: apt-mark hold kubelet kubeadm kubectl || true
+      changed_when: false
+
+    - name: Включить kubelet
+      ansible.builtin.systemd:
+        name: kubelet
+        state: started
+        enabled: true
+
+- name: kubeadm init на первой control plane ноде
+  hosts: k8s_control[0]
+  become: true
+  tags: [kubeadm, kubeadm_init]
+  tasks:
+    - name: Проверить admin.conf
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: _admin_conf
+
+    - name: kubeadm init
+      ansible.builtin.shell: |
+        set -euo pipefail
+        EP="{{ kubeadm_control_plane_endpoint | default('') }}"
+        if [ -n "$EP" ]; then
+          kubeadm init \
+            --pod-network-cidr={{ kubeadm_pod_network_cidr | default('10.244.0.0/16') }} \
+            --apiserver-advertise-address={{ kubeadm_apiserver_advertise_address | default(ansible_host, true) }} \
+            --control-plane-endpoint="$EP"
+        else
+          kubeadm init \
+            --pod-network-cidr={{ kubeadm_pod_network_cidr | default('10.244.0.0/16') }} \
+            --apiserver-advertise-address={{ kubeadm_apiserver_advertise_address | default(ansible_host, true) }}
+        fi
+      args:
+        executable: /bin/bash
+        creates: /etc/kubernetes/admin.conf
+      when: not _admin_conf.stat.exists
+
+- name: Сеть Flannel (CNI)
+  hosts: k8s_control[0]
+  become: true
+  tags: [kubeadm, kubeadm_cni]
+  tasks:
+    - name: Дождаться kube-apiserver
+      ansible.builtin.wait_for:
+        port: 6443
+        host: 127.0.0.1
+        delay: 5
+        timeout: 300
+
+    - name: Установить Flannel
+      ansible.builtin.command: >
+        kubectl apply -f {{ kubernetes_cni_manifest_url | default('https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml') }}
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: _fl
+      changed_when: "'created' in (_fl.stdout | default('')) or 'configured' in (_fl.stdout | default(''))"
+
+- name: Команда kubeadm join для workers
+  hosts: k8s_control[0]
+  become: true
+  tags: [kubeadm, kubeadm_join_token]
+  tasks:
+    - name: Сгенерировать join command
+      ansible.builtin.command: kubeadm token create --print-join-command
+      register: _join
+      changed_when: false
+
+    - name: Сохранить join
+      ansible.builtin.set_fact:
+        kubeadm_join_command: "{{ _join.stdout | trim }}"
+
+- name: Сохранить kubeconfig локально (kubeadm)
+  hosts: k8s_control[0]
+  become: true
+  tags: [kubeadm, kubeconfig]
+  vars:
+    repo_root: "{{ repo_root_override | default(playbook_dir | dirname | dirname | dirname) }}"
+    kubeconfig_local: "{{ repo_root }}/automation/build/kubeconfig"
+    k8s_api_public: "{{ kubeadm_kubeconfig_public_address | default(ansible_host, true) }}"
+  tasks:
+    - name: Прочитать admin.conf
+      ansible.builtin.slurp:
+        src: /etc/kubernetes/admin.conf
+      register: _adm
+
+    - name: Записать kubeconfig (подмена server на публичный адрес API)
+      ansible.builtin.copy:
+        dest: "{{ kubeconfig_local }}"
+        mode: "0600"
+        content: >-
+          {{ (_adm.content | b64decode)
+             | regex_replace('(server:\\s*)https://[^\\s]+', '\\1https://' ~ k8s_api_public ~ ':6443') }}
+      delegate_to: localhost
+      connection: local
+      become: false
+
+- name: Присоединить worker-ноды (kubeadm join)
+  hosts: k8s_workers
+  become: true
+  tags: [kubeadm, kubeadm_workers]
+  serial: 1
+  when:
+    - k8s_join_workers | default(false)
+    - groups['k8s_workers'] is defined
+    - (groups['k8s_workers'] | length) > 0
+  vars:
+    k8s_primary: "{{ groups['k8s_control'][0] }}"
+    _join_cmd: "{{ hostvars[k8s_primary]['kubeadm_join_command'] }}"
+  tasks:
+    - name: kubeadm join
+      ansible.builtin.command: "{{ _join_cmd }}"
+      args:
+        creates: /etc/kubernetes/kubelet.conf

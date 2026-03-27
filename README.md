@@ -89,12 +89,17 @@ k8s/
 ├── cronjob.yaml            CronJob агентов (каждую минуту)
 └── settings-template.php  Шаблон /bitrix/.settings.php
 
-automation/                 «Без ручных шагов» на серверах (Ansible + скрипты)
+automation/                 Ansible + скрипты
 ├── ansible/
 │   ├── ansible.cfg
 │   ├── inventory/hosts.yml.example
 │   ├── group_vars/all.yml.example
-│   ├── playbooks/site.yml    # k3s, NFS, ingress/nfs provisioner/metrics/cert-manager, Helm
+│   ├── playbooks/
+│   │   ├── site.yml              # по умолчанию: kubeadm + NFS + Helm + Bitrix
+│   │   ├── site-k3s.yml          # опционально: k3s вместо kubeadm
+│   │   ├── kubeadm-bootstrap.yml
+│   │   ├── k3s-bootstrap.yml
+│   │   └── cluster-common.yml    # NFS, аддоны, Helm Bitrix
 │   └── templates/
 └── scripts/
     ├── init-ansible-config.sh
@@ -105,18 +110,18 @@ automation/                 «Без ручных шагов» на сервер
 
 ## Автоматизация деплоя
 
-Нужны: **Ansible** и **Helm** на машине, с которой запускаете плейбуки (Linux, WSL или macOS), **SSH** к Ubuntu/Debian ВМ. На серверах плейбуки ставят **k3s**, при необходимости **NFS**, затем через **Helm** — ingress-nginx, nfs-subdir-external-provisioner, metrics-server, cert-manager и чарт **Bitrix**.
+Нужны: **Ansible** и **Helm** на машине, с которой запускаете плейбуки (Linux, WSL или macOS), **SSH** к Ubuntu/Debian ВМ. По умолчанию **`playbooks/site.yml`** поднимает **Kubernetes через kubeadm** (containerd, официальный apt kubernetes, **Flannel**), сохраняет `automation/build/kubeconfig`, при необходимости настраивает **NFS**, затем через **Helm** — ingress-nginx, nfs-subdir-external-provisioner, metrics-server, cert-manager и чарт **Bitrix**. Вместо kubeadm можно использовать **k3s**: `ansible-playbook playbooks/site-k3s.yml` (в `group_vars` для metrics часто нужно `metrics_server_patch_kubelet_insecure_tls: true`).
 
-### Быстрый старт
+### Быстрый старт (kubeadm)
 
 ```bash
 bash automation/scripts/init-ansible-config.sh
-# Отредактируйте automation/ansible/inventory/hosts.yml и automation/ansible/group_vars/all.yml
+# inventory: группы k8s_control, k8s_workers, nfs_server; all.yml — домен, k8s_join_workers и т.д.
 cd automation/ansible
 ansible-playbook playbooks/site.yml
 ```
 
-Точечно (теги): `--tags k3s`, `--tags nfs`, `--tags addons`, `--tags bitrix`. Если кластер уже есть и kubeconfig лежит в `automation/build/kubeconfig`: `ansible-playbook playbooks/site.yml --tags bitrix`.
+Точечно (теги): например `--tags kubeadm`, `--tags nfs`, `--tags addons`, `--tags bitrix`. Уже есть кластер и `automation/build/kubeconfig`: `--tags nfs,addons,bitrix` или только `--tags bitrix`.
 
 ### Только Helm при готовом кластере
 
@@ -127,7 +132,7 @@ LE_EMAIL=you@example.com bash automation/scripts/helm-deploy-from-kubeconfig.sh 
 
 Пароли сохраняются в `automation/build/bitrix-secrets.yaml` (каталог в `.gitignore`).
 
-**Ограничения:** плейбуки рассчитаны на **Debian/Ubuntu** (`apt`) для k3s-нод и NFS; для bare-metal **Ingress** нужен внешний L4 или MetalLB — иначе IP сервиса ingress останется `<pending>`. Домен должен указывать на этот IP до выпуска Let’s Encrypt.
+**Ограничения:** узлы кластера и NFS — **Debian/Ubuntu** (`apt`). **HA control plane** (несколько master) автоматом не собирается: задайте `kubeadm_control_plane_endpoint` и добавьте остальные CP по [документации kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/). Для bare-metal **Ingress** часто нужен L4 или **MetalLB**. Домен должен указывать на IP Ingress до Let’s Encrypt.
 
 ---
 
@@ -159,9 +164,9 @@ LE_EMAIL=you@example.com bash automation/scripts/helm-deploy-from-kubeconfig.sh 
 | `ingress.tls.enabled` / `ingress.tls.certManager` | TLS и Let's Encrypt через cert-manager |
 | `certManager.createClusterIssuer` | Создать ClusterIssuer в кластере |
 
-### Сценарий A: свои VM / k3s
+### Сценарий A: свои VM / Kubernetes (kubeadm или иной кластер)
 
-1. Подготовьте кластер (пример — k3s без встроенного Traefik, если ставите ingress-nginx), **NFS + nfs-subdir-external-provisioner** или другой RWX StorageClass, **ingress-nginx**, при необходимости **cert-manager**, **metrics-server**.
+1. Подготовьте кластер (например `ansible-playbook playbooks/site.yml` или свой **kubeadm**/дистрибутив), **NFS + nfs-subdir-external-provisioner** или другой RWX StorageClass, **ingress-nginx**, при необходимости **cert-manager**, **metrics-server**.
 2. Сгенерируйте секреты и установите чарт:
 
 ```bash

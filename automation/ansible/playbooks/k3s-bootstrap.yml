@@ -1,0 +1,95 @@
+---
+# Устаревший вариант: k3s. Запуск: ansible-playbook playbooks/site-k3s.yml
+
+- name: Установить k3s (control plane)
+  hosts: k8s_control
+  become: true
+  tags: [k3s, k3s_server]
+  vars:
+    repo_root: "{{ repo_root_override | default(playbook_dir | dirname | dirname | dirname) }}"
+  pre_tasks:
+    - name: Собрать INSTALL_K3S_EXEC
+      ansible.builtin.set_fact:
+        _install_k3s_exec: "{{ ('--disable traefik ' if (k3s_disable_traefik | default(true)) else '') }}--write-kubeconfig-mode {{ k3s_write_kubeconfig_mode | default('644') }}"
+  tasks:
+    - name: Проверить curl (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: curl
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Установить k3s server
+      ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
+      args:
+        creates: /usr/local/bin/k3s
+      environment:
+        INSTALL_K3S_EXEC: "{{ _install_k3s_exec }}"
+
+    - name: Включить k3s
+      ansible.builtin.systemd:
+        name: k3s
+        state: started
+        enabled: true
+
+- name: Сохранить kubeconfig локально (k3s)
+  hosts: k8s_control[0]
+  become: true
+  tags: [k3s, kubeconfig]
+  vars:
+    repo_root: "{{ repo_root_override | default(playbook_dir | dirname | dirname | dirname) }}"
+    kubeconfig_local: "{{ repo_root }}/automation/build/kubeconfig"
+    k3s_api_public: "{{ ansible_host }}"
+  tasks:
+    - name: Прочитать /etc/rancher/k3s/k3s.yaml
+      ansible.builtin.slurp:
+        src: /etc/rancher/k3s/k3s.yaml
+      register: k3s_kubeconfig_b64
+
+    - name: Записать kubeconfig на control machine
+      ansible.builtin.copy:
+        dest: "{{ kubeconfig_local }}"
+        mode: "0600"
+        content: >-
+          {{ (k3s_kubeconfig_b64.content | b64decode)
+             | regex_replace('127.0.0.1', k3s_api_public)
+             | regex_replace('localhost', k3s_api_public) }}
+      delegate_to: localhost
+      connection: local
+      become: false
+
+- name: Получить токен для worker’ов (k3s)
+  hosts: k8s_control[0]
+  become: true
+  tags: [k3s, k3s_workers]
+  tasks:
+    - name: Прочитать node-token
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: _node_token
+
+    - name: Сохранить факт registration token
+      ansible.builtin.set_fact:
+        k3s_registration_token: "{{ _node_token.content | b64decode | trim }}"
+
+- name: Присоединить k3s worker-ноды
+  hosts: k8s_workers
+  become: true
+  tags: [k3s, k3s_workers]
+  serial: 1
+  when:
+    - k8s_join_workers | default(false)
+    - groups['k8s_workers'] is defined
+    - (groups['k8s_workers'] | length) > 0
+  vars:
+    k3s_primary: "{{ groups['k8s_control'][0] }}"
+    k3s_url: "https://{{ hostvars[k3s_primary]['ansible_host'] }}:6443"
+    k3s_token: "{{ hostvars[k3s_primary]['k3s_registration_token'] }}"
+  tasks:
+    - name: Установить k3s agent
+      ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
+      environment:
+        K3S_URL: "{{ k3s_url }}"
+        K3S_TOKEN: "{{ k3s_token }}"
+      args:
+        creates: /usr/local/bin/k3s

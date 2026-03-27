@@ -1,0 +1,204 @@
+---
+# NFS + Helm (ingress, nfs provisioner, metrics, cert-manager) + Bitrix chart.
+# Вызывается из site.yml после подготовки kubeconfig.
+
+- name: Настроить NFS-сервер на ВМ
+  hosts: nfs_server
+  become: true
+  tags: [nfs]
+  tasks:
+    - name: Пакет nfs-kernel-server (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: nfs-kernel-server
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Каталог экспорта
+      ansible.builtin.file:
+        path: "{{ nfs_export_path }}"
+        state: directory
+        mode: "0755"
+
+    - name: Строка в /etc/exports
+      ansible.builtin.lineinfile:
+        path: /etc/exports
+        line: "{{ nfs_exports_line }}"
+        create: true
+        mode: "0644"
+
+    - name: Применить exports
+      ansible.builtin.command: exportfs -rav
+      changed_when: true
+
+    - name: Включить NFS
+      ansible.builtin.systemd:
+        name: nfs-kernel-server
+        state: started
+        enabled: true
+
+- name: Cluster addon’ы (ingress, NFS provisioner, metrics, cert-manager)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [addons, helm]
+  vars:
+    repo_root: "{{ repo_root_override | default(playbook_dir | dirname | dirname | dirname) }}"
+    kubeconfig_local: "{{ repo_root }}/automation/build/kubeconfig"
+  tasks:
+    - name: Проверить kubeconfig
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_local }}"
+      register: _kc
+
+    - name: Сообщить если нет kubeconfig
+      ansible.builtin.fail:
+        msg: "Нет {{ kubeconfig_local }} — сначала плей с тегами kubeadm,kubeconfig или k3s,kubeconfig / положите kubeconfig вручную."
+      when: not _kc.stat.exists
+
+    - name: Helm repo ingress-nginx
+      ansible.builtin.command: helm repo add ingress-nginx {{ ingress_nginx_repo }}
+      register: _hr1
+      failed_when: false
+      changed_when: _hr1.rc == 0
+
+    - name: Проверить helm repo ingress-nginx
+      ansible.builtin.fail:
+        msg: "{{ _hr1.stderr | default(_hr1.stdout) }}"
+      when: _hr1.rc != 0 and ('already exists' not in ((_hr1.stderr | default('')) ~ (_hr1.stdout | default(''))))
+
+    - name: Helm repo nfs-subdir-external-provisioner
+      ansible.builtin.command: helm repo add nfs-subdir-external-provisioner {{ nfs_provisioner_repo }}
+      register: _hr2
+      failed_when: false
+      changed_when: _hr2.rc == 0
+
+    - name: Проверить helm repo nfs-provisioner
+      ansible.builtin.fail:
+        msg: "{{ _hr2.stderr | default(_hr2.stdout) }}"
+      when: _hr2.rc != 0 and ('already exists' not in ((_hr2.stderr | default('')) ~ (_hr2.stdout | default(''))))
+
+    - name: Helm repo jetstack
+      ansible.builtin.command: helm repo add jetstack https://charts.jetstack.io
+      register: _hr3
+      failed_when: false
+      changed_when: _hr3.rc == 0
+
+    - name: Проверить helm repo jetstack
+      ansible.builtin.fail:
+        msg: "{{ _hr3.stderr | default(_hr3.stdout) }}"
+      when: _hr3.rc != 0 and ('already exists' not in ((_hr3.stderr | default('')) ~ (_hr3.stdout | default(''))))
+
+    - name: Helm repo update
+      ansible.builtin.command: helm repo update
+      changed_when: true
+
+    - name: Установить ingress-nginx
+      ansible.builtin.command: >
+        helm upgrade --install {{ ingress_nginx_release }} {{ ingress_nginx_chart }}
+        --kubeconfig {{ kubeconfig_local }}
+        --namespace ingress-nginx --create-namespace
+      when: install_ingress_nginx | default(true)
+      changed_when: true
+
+    - name: Установить nfs-subdir-external-provisioner
+      ansible.builtin.command: >
+        helm upgrade --install {{ nfs_provisioner_release }} {{ nfs_provisioner_chart }}
+        --kubeconfig {{ kubeconfig_local }}
+        --set nfs.server={{ nfs_server_host }}
+        --set nfs.path={{ nfs_export_path }}
+        --set storageClass.name={{ nfs_provisioner_storage_class }}
+      when: install_nfs_provisioner | default(true)
+      changed_when: true
+
+    - name: Установить metrics-server (манифест upstream)
+      ansible.builtin.command: >
+        kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+        --kubeconfig={{ kubeconfig_local }}
+      changed_when: true
+
+    - name: Патч metrics-server (insecure kubelet TLS — нужно для k3s и части узких сборок)
+      ansible.builtin.command: >
+        kubectl patch deployment metrics-server -n kube-system --type=json
+        -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+        --kubeconfig={{ kubeconfig_local }}
+      when: metrics_server_patch_kubelet_insecure_tls | default(false)
+      register: _msp
+      changed_when: "'patched' in (_msp.stdout | default(''))"
+      failed_when: false
+
+    - name: Установить cert-manager
+      ansible.builtin.command: >
+        helm upgrade --install {{ cert_manager_release }} jetstack/cert-manager
+        --kubeconfig {{ kubeconfig_local }}
+        --namespace {{ cert_manager_namespace }} --create-namespace
+        --set installCRDs=true
+      when: cert_manager_install | default(true)
+      changed_when: true
+
+- name: Развернуть Bitrix Helm (секреты + install)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: [bitrix, app]
+  vars:
+    repo_root: "{{ repo_root_override | default(playbook_dir | dirname | dirname | dirname) }}"
+    kubeconfig_local: "{{ repo_root }}/automation/build/kubeconfig"
+    helm_chart_dir: "{{ repo_root }}/helm/bitrix"
+    secrets_path: "{{ repo_root }}/automation/build/bitrix-secrets.yaml"
+    extra_values_path: "{{ repo_root }}/automation/build/bitrix-extra-values.yaml"
+  tasks:
+    - name: Проверить kubeconfig
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_local }}"
+      register: _kc2
+
+    - ansible.builtin.fail:
+        msg: "Нужен kubeconfig: {{ kubeconfig_local }}"
+      when: not _kc2.stat.exists
+
+    - name: Сгенерировать пароль PostgreSQL
+      ansible.builtin.command: openssl rand -base64 24
+      register: _pg
+      changed_when: false
+
+    - name: Сгенерировать пароль Redis
+      ansible.builtin.command: openssl rand -base64 24
+      register: _rds
+      changed_when: false
+
+    - name: Сгенерировать PUSH_SECURITY_KEY (128 hex-символов)
+      ansible.builtin.command: openssl rand -hex 64
+      register: _push
+      changed_when: false
+
+    - name: Записать bitrix-secrets.yaml
+      ansible.builtin.copy:
+        dest: "{{ secrets_path }}"
+        mode: "0600"
+        content: |
+          secrets:
+            postgresPassword: "{{ _pg.stdout | trim }}"
+            redisPassword: "{{ _rds.stdout | trim }}"
+            pushSecurityKey: "{{ _push.stdout | trim }}"
+
+    - name: Шаблон доп. values
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/bitrix-extra-values.yaml.j2"
+        dest: "{{ extra_values_path }}"
+        mode: "0644"
+
+    - name: Helm install / upgrade Bitrix
+      ansible.builtin.command: >
+        helm upgrade --install {{ bitrix_release }} {{ helm_chart_dir }}
+        --kubeconfig {{ kubeconfig_local }}
+        --namespace {{ bitrix_namespace }} --create-namespace
+        -f {{ secrets_path }}
+        -f {{ extra_values_path }}
+      changed_when: true
+
+    - name: Итог
+      ansible.builtin.debug:
+        msg:
+          - "Пароли записаны в {{ secrets_path }} (не коммитьте)."
+          - "Откройте https://{{ bitrix_domain }}/bitrixsetup.php после готовности подов."

@@ -1,0 +1,6 @@
+---
+# Упрощённый кластер k3s (legacy). Иначе используйте playbooks/site.yml (kubeadm).
+
+- import_playbook: k3s-bootstrap.yml
+
+- import_playbook: cluster-common.yml
