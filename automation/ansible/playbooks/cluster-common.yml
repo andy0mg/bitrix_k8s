@@ -298,7 +298,7 @@
           - "{{ secrets_path }}"
           - -f
           - "{{ extra_values_path }}"
-      chdir: "{{ repo_root }}"
+        chdir: "{{ repo_root }}"
       environment:
         KUBECONFIG: "{{ kubeconfig_local }}"
       changed_when: true
