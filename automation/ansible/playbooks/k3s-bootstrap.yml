@@ -77,10 +77,6 @@
   become: true
   tags: [k3s, k3s_workers]
   serial: 1
-  when:
-    - k8s_join_workers | default(false)
-    - groups['k8s_workers'] is defined
-    - (groups['k8s_workers'] | length) > 0
   vars:
     k3s_primary: "{{ groups['k8s_control'][0] }}"
     k3s_url: "https://{{ hostvars[k3s_primary]['ansible_host'] }}:6443"
@@ -93,3 +89,7 @@
         K3S_TOKEN: "{{ k3s_token }}"
       args:
         creates: /usr/local/bin/k3s
+      when:
+        - k8s_join_workers | default(false)
+        - groups['k8s_workers'] is defined
+        - (groups['k8s_workers'] | length) > 0

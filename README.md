@@ -117,12 +117,12 @@ automation/                 Ansible + скрипты
 
 - Несколько **виртуальных машин с Ubuntu 22.04** (или Debian). Минимально разумно: **2 ВМ** — одна под кластер (control plane), вторая под **NFS**. Лучше ещё **1–2 ВМ worker**, иначе поды с Битриксом на master **не запустятся** (на control plane по умолчанию стоит taint `NoSchedule`).
 - У всех ВМ **статичные IP**, доступ по **SSH** с вашей машины (логин с `sudo` без пароля или знайте пароль sudo).
-- На **вашей машине** (Linux, macOS или **WSL** в Windows): установлены **Git**, **Python 3**, **Ansible**, **kubectl**, **Helm**. Пример для Ubuntu/WSL:
+- На **вашей машине** (Linux, macOS или **WSL** в Windows): установлены **Git**, **Ansible**, **kubectl**, **Helm**. На Ubuntu/Debian проще всего поставить **ansible-core** из репозитория дистрибутива:
   ```bash
-  sudo apt update && sudo apt install -y git python3-pip
-  pip install --user ansible
+  sudo apt update && sudo apt install -y git ansible-core
   # helm и kubectl — по официальным инструкциям с сайтов kubernetes.io / helm.sh
   ```
+  Нужна более свежая версия Ansible — тогда `pip install --user ansible` (потребуется `python3-pip`).
 - **Домен** для сайта (например `bitrix.company.ru`) желателен для TLS. Пока можно работать по **IP** (см. шаг 9) — Let’s Encrypt по IP не выдаст, тогда в `group_vars/all.yml` отключите TLS для теста или используйте свой сертификат позже.
 
 ### 1. Склонировать проект

@@ -242,10 +242,6 @@
   become: true
   tags: [kubeadm, kubeadm_workers]
   serial: 1
-  when:
-    - k8s_join_workers | default(false)
-    - groups['k8s_workers'] is defined
-    - (groups['k8s_workers'] | length) > 0
   vars:
     k8s_primary: "{{ groups['k8s_control'][0] }}"
     _join_cmd: "{{ hostvars[k8s_primary]['kubeadm_join_command'] }}"
@@ -254,3 +250,7 @@
       ansible.builtin.command: "{{ _join_cmd }}"
       args:
         creates: /etc/kubernetes/kubelet.conf
+      when:
+        - k8s_join_workers | default(false)
+        - groups['k8s_workers'] is defined
+        - (groups['k8s_workers'] | length) > 0
