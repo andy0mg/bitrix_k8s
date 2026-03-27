@@ -29,6 +29,8 @@ nfs_provisioner_release: nfs-subdir-external-provisioner
 nfs_provisioner_repo: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
 nfs_provisioner_chart: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
 nfs_provisioner_storage_class: nfs-client
+# SCHEDULE ON CP (по умолчанию как ingress_nginx_on_control_plane)
+# nfs_provisioner_on_control_plane: true
 
 nfs_server_host: "{{ hostvars[groups['nfs_server'][0]]['ansible_host'] }}"
 
@@ -51,6 +53,8 @@ cert_manager_release: cert-manager
 
 # Для kubeadm обычно не нужен; для k3s часто true
 metrics_server_patch_kubelet_insecure_tls: false
+# Поднимать metrics-server на control-plane при одной ноде (по умолчанию как ingress_nginx_on_control_plane)
+# metrics_server_tolerate_control_plane: true
 
 # --- Bitrix Helm ---
 bitrix_domain: portal.example.com

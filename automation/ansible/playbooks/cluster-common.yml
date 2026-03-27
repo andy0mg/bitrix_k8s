@@ -122,6 +122,13 @@
       when: install_ingress_nginx | default(true)
       changed_when: true
 
+    - name: Шаблон values для nfs-subdir-external-provisioner
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/nfs-subdir-external-provisioner-values.yaml.j2"
+        dest: "{{ repo_root }}/automation/build/nfs-subdir-external-provisioner-values.yaml"
+        mode: "0644"
+      when: install_nfs_provisioner | default(true)
+
     - name: Установить nfs-subdir-external-provisioner
       ansible.builtin.command: >
         helm upgrade --install {{ nfs_provisioner_release }} {{ nfs_provisioner_chart }}
@@ -130,6 +137,7 @@
         --set nfs.server={{ nfs_server_host }}
         --set nfs.path={{ nfs_export_path }}
         --set storageClass.name={{ nfs_provisioner_storage_class }}
+        -f {{ repo_root }}/automation/build/nfs-subdir-external-provisioner-values.yaml
       when: install_nfs_provisioner | default(true)
       changed_when: true
 
@@ -138,6 +146,24 @@
         kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
         --kubeconfig={{ kubeconfig_local }}
       changed_when: true
+
+    - name: Патч metrics-server — tolerations control-plane (одна нода / taint)
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - patch
+          - deployment
+          - metrics-server
+          - -n
+          - kube-system
+          - --type=strategic
+          - --kubeconfig={{ kubeconfig_local }}
+          - -p
+          - '{"spec":{"template":{"spec":{"tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"},{"key":"node-role.kubernetes.io/master","operator":"Exists","effect":"NoSchedule"}]}}}}'
+      when: metrics_server_tolerate_control_plane | default(ingress_nginx_on_control_plane | default(true)) | bool
+      register: _ms_tol
+      changed_when: _ms_tol.rc == 0
+      failed_when: false
 
     - name: Патч metrics-server (insecure kubelet TLS — нужно для k3s и части узких сборок)
       ansible.builtin.command: >
